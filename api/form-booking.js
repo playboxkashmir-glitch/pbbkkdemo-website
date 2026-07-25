@@ -87,6 +87,7 @@ export default async function handler(req, res) {
                 rate,
                 payment_method,
                 notes,
+                submitted_by_email,
         } = body;
 
       const missing = [];
@@ -204,6 +205,7 @@ export default async function handler(req, res) {
                                           booking_date,
                                           time_slot,
                                           suggestions,
+                                    submitted_by_email,
                             });
                 } catch (emailErr) {
                             console.error('Booking failed email error:', emailErr);
