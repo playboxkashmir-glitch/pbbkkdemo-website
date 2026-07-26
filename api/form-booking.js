@@ -182,17 +182,33 @@ export default async function handler(req, res) {
           return res.status(201).json({ booking });
       } catch (err) {
               if (err && err.code === '23505') {
-                        let suggestions = [];
+                        let suggestions = { prior: [], later: [] };
                         try {
                                     const blockedRows = await query(
                                                   "SELECT start_time FROM bookings WHERE facility_id = $1 AND booking_date = $2 AND status IN ('reserved','confirmed')",
                                                   [facilityId, booking_date]
                                                 );
                                     const blockedSet = new Set(blockedRows.rows.map((r) => r.start_time));
-                                    suggestions = ALL_SLOTS_24H
-                                      .filter(([s]) => !blockedSet.has(s) && s !== startTime)
-                                      .slice(0, 5)
-                                      .map(([s, e]) => to12HourLabel(s, e));
+                                    const startIdx = ALL_SLOTS_24H.findIndex(([s]) => s === startTime);
+                                    const priorSlots = [];
+                                    const laterSlots = [];
+                                    if (startIdx !== -1) {
+                                      for (let i = startIdx - 1; i >= 0 && priorSlots.length < 3; i--) {
+                                        const [s, e] = ALL_SLOTS_24H[i];
+                                        if (!blockedSet.has(s)) priorSlots.unshift(to12HourLabel(s, e));
+                                      }
+                                      for (let i = startIdx + 1; i < ALL_SLOTS_24H.length && laterSlots.length < 3; i++) {
+                                        const [s, e] = ALL_SLOTS_24H[i];
+                                        if (!blockedSet.has(s)) laterSlots.push(to12HourLabel(s, e));
+                                      }
+                                    } else {
+                                      const fallback = ALL_SLOTS_24H
+                                        .filter(([s]) => !blockedSet.has(s) && s !== startTime)
+                                        .slice(0, 5)
+                                        .map(([s, e]) => to12HourLabel(s, e));
+                                      laterSlots.push(...fallback);
+                                    }
+                                    suggestions = { prior: priorSlots, later: laterSlots };
                         } catch (lookupErr) {
                                     console.error('Alternative slot lookup error:', lookupErr);
                         }
