@@ -41,7 +41,7 @@ export default async function handler(req, res) {
         if (body.terms_accepted !== true) {
             return res.status(400).json({ error: 'You must accept the Terms & Conditions, Privacy Policy and Cancellation Policy before payment.' });
         }
-        if (!hours.every(function(h) { return Number.isInteger(h); })) {
+        if (!hours.every(function(h) { return Number.isInteger(h) && h >= 0 && h < 26; })) {
             return res.status(400).json({ error: 'hours[] must contain valid hour numbers.' });
         }
 
@@ -76,7 +76,7 @@ export default async function handler(req, res) {
 
         let basePriceTotal = 0;
         hours.forEach(function(h) {
-            const isPeak = PEAK_HOURS.indexOf(h) !== -1;
+            const isPeak = PEAK_HOURS.indexOf(h % 24) !== -1;
             basePriceTotal += isPeak ? peakPrice : basePrice;
         });
 
@@ -153,14 +153,14 @@ export default async function handler(req, res) {
         }
 
         return res.status(200).json({
-            ...data,
+            id: data.id,
             amount: data.amount,
             currency: data.currency,
             is_reserve: isReserve,
             full_amount: totalAmount,
             reserve_amount: isReserve ? reserveAmount : null,
             balance_due: balanceDue,
-        });
+        })
     } catch (err) {
         console.error('Create order error:', err);
         return res.status(500).json({ error: 'Server error while creating order.' });
