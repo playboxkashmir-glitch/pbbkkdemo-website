@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS bookings (
   end_time TEXT NOT NULL,
   rate NUMERIC(10,2) NOT NULL,
   amount NUMERIC(10,2) NOT NULL,
+  payment_status TEXT NOT NULL DEFAULT 'paid' CHECK (payment_status IN ('paid','partial')),
+  amount_paid NUMERIC(10,2),
   payment_method TEXT NOT NULL DEFAULT 'cash',
   status TEXT NOT NULL DEFAULT 'confirmed' CHECK (status IN ('reserved','confirmed','cancelled','completed')),
   source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual','online')),
