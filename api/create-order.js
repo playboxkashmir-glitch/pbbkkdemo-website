@@ -16,7 +16,7 @@ const DEFAULT_INAUGURAL_DISCOUNT_PCT = 15;
 // Flat amount (before convenience fee) a customer pays to reserve a slot
 // without paying in full up front. The remaining balance is due later.
 const DEFAULT_RESERVE_AMOUNT = 500;
-const TERMS_VERSION = '2026-07-07'; // bump when Terms/Privacy/Cancellation policy text changes
+const TERMS_VERSION = '2026-07-26'; // bump when Terms/Privacy/Cancellation policy text changes
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
