@@ -71,6 +71,9 @@ async function loadDashboardSummary() {
     setText('stat-revenue', formatCurrency(data.today ? data.today.revenue : 0));
     setText('stat-week', data.week ? data.week.count : 0);
     setText('stat-month', formatCurrency(data.month ? data.month.revenue : 0));
+        renderRevenueChart(data.last7Days);
+        renderDashboardSportBreakdown(data.bySport);
+        renderPeakHours(data.peakHours);
   } catch (err) {
     console.error('Failed to load dashboard summary', err);
   }
@@ -85,6 +88,69 @@ function formatCurrency(amount) {
   const n = Number(amount) || 0;
   return '₹' + n.toLocaleString('en-IN');
 }
+
+const SPORT_COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ef4444', '#06b6d4'];
+
+function formatCurrencyShort(amount) {
+    const n = Number(amount) || 0;
+    if (n >= 1000) return '\u20b9' + (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return '\u20b9' + n.toLocaleString('en-IN');
+}
+
+function renderRevenueChart(days) {
+    const el = document.getElementById('revenueChartBars');
+    if (!el) return;
+    if (!days || !days.length) {
+          el.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:1.5rem;">No revenue data yet.</p>';
+          return;
+    }
+    const maxRevenue = Math.max.apply(null, days.map(function (d) { return Number(d.revenue); })) || 1;
+    el.innerHTML = days.map(function (d) {
+          const revenue = Number(d.revenue);
+          const pct = revenue > 0 ? Math.max(Math.round((revenue / maxRevenue) * 100), 4) : 0;
+          const isPeak = revenue === maxRevenue && revenue > 0;
+          return '<div class="bar-wrap">' +
+                  '<div class="bar' + (isPeak ? ' peak' : '') + '" style="height:' + pct + '%"><span class="bar-val">' + formatCurrencyShort(revenue) + '</span></div>' +
+                  '<span class="bar-label">' + escapeHtml(d.label) + '</span>' +
+                  '</div>';
+    }).join('');
+}
+
+function renderDashboardSportBreakdown(bySport) {
+    const el = document.getElementById('dashboardSportBreakdown');
+    if (!el) return;
+    if (!bySport || !bySport.length) {
+          el.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:1rem;">No booking data yet.</p>';
+          return;
+    }
+    const total = bySport.reduce(function (sum, s) { return sum + Number(s.count); }, 0) || 1;
+    el.innerHTML = bySport.map(function (s, i) {
+          const pct = Math.round((Number(s.count) / total) * 100);
+          const color = SPORT_COLORS[i % SPORT_COLORS.length];
+          return '<div class="sport-row">' +
+                  '<div class="sport-row-info"><span class="sport-dot" style="background:' + color + ';"></span><span>' + escapeHtml(s.sport_name) + '</span></div>' +
+                  '<div class="sport-bar-wrap"><div class="sport-bar" style="width:' + pct + '%;background:' + color + ';"></div></div>' +
+                  '<span class="sport-pct">' + pct + '%</span>' +
+                  '</div>';
+    }).join('');
+}
+
+function renderPeakHours(peakHours) {
+    const el = document.getElementById('peakHoursGrid');
+    if (!el) return;
+    if (!peakHours || !peakHours.length) return;
+    const sorted = peakHours.slice().sort(function (a, b) { return Number(b.count) - Number(a.count); });
+    const highKey = sorted[0] ? sorted[0].key : null;
+    const midKey = sorted[1] ? sorted[1].key : null;
+    el.innerHTML = peakHours.map(function (p) {
+          let cls = 'low';
+          if (p.key === highKey && Number(p.count) > 0) cls = 'high';
+          else if (p.key === midKey && Number(p.count) > 0) cls = 'mid';
+          const star = cls === 'high' ? ' \u2b50' : '';
+          return '<div class="hour-cell ' + cls + '" title="' + escapeHtml(p.range) + '">' + escapeHtml(p.label) + star + '</div>';
+    }).join('');
+}
+
 
 async function loadTodayBookings() {
   const tbody = document.getElementById('todayBookingsTable');
