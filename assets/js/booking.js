@@ -382,27 +382,6 @@ async function applyPromo() {
    }
 }
 
-async function toggleQuickPromo() {
-      const btn = document.getElementById('btn-quick-pbk10');
-      if (!btn) return;
-      if (state.promoCode === 'PBK10') {
-               const codeInput = document.getElementById('promoCode');
-               if (codeInput) codeInput.value = '';
-               state.promoCode = null;
-               state.promoType = null;
-               state.promoValue = 0;
-               state.promoMinAmount = 0;
-               calculatePrice(); renderSummaryStep3();
-               const resultEl = document.getElementById('promoResult');
-               if (resultEl) { resultEl.textContent = ''; resultEl.className = 'promo-result'; }
-               btn.textContent = 'APPLY';
-      } else {
-               document.getElementById('promoCode').value = 'PBK10';
-               await applyPromo();
-               if (state.promoCode === 'PBK10') { btn.textContent = 'REMOVE'; }
-      }
-}
-
 function validateAndProceed() {
    const name = document.getElementById('custName').value.trim();
    const phone = document.getElementById('custPhone').value.trim();
