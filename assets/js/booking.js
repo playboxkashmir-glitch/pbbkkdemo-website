@@ -18,6 +18,7 @@ const CONFIG = {
        gst_rate: 0,
        convenience_fee: 7,
        inaugural_discount_pct: 15,
+       reserve_amount: 500,
        reservation_minutes: 10
 };
 
@@ -48,6 +49,11 @@ function toLocalDateKey(date) { if (!date) return ''; var y = date.getFullYear()
          basePrice: 0,
          gstAmount: 0,
          totalAmount: 0,
+         paymentMode: 'full',
+         isReserve: false,
+         fullAmount: 0,
+         reserveAmount: 0,
+         balanceDue: 0,
          bookingId: null,
          reservationTimer: null,
          reservationSeconds: CONFIG.reservation_minutes * 60
@@ -105,6 +111,7 @@ async function loadSettings() {
                      CONFIG.convenience_fee = fee;
             }
           if (Array.isArray(data.peak_hours) && data.peak_hours.length) { CONFIG.peak_hours = data.peak_hours; } var inauguralPct = parseFloat(data.inaugural_discount_pct); if (!isNaN(inauguralPct)) { CONFIG.inaugural_discount_pct = inauguralPct; }
+          var reserveAmt = parseFloat(data.reserve_amount); if (!isNaN(reserveAmt)) { CONFIG.reserve_amount = reserveAmt; }
      } catch (err) {
             console.error('Could not load settings from server:', err);
      }
@@ -432,6 +439,7 @@ function lookupReturningCustomer(email) { if (!email) return; fetch('/api/bookin
    if (totalEl) totalEl.innerHTML = '<strong>₹' + state.totalAmount + '</strong>';
    const payBtnAmount = document.getElementById('btnPayAmount');
    if (payBtnAmount) payBtnAmount.textContent = '₹' + state.totalAmount;
+   var reserveBtnAmount = document.getElementById('btnReserveAmount'); if (reserveBtnAmount) reserveBtnAmount.textContent = '₹' + (CONFIG.reserve_amount + CONFIG.convenience_fee);
    const discRow = document.getElementById('discountRow');
    if (discRow) {
       if (state.promoDiscount > 0) {
@@ -482,7 +490,8 @@ function stopReservationTimer() {
 }
 function createSlotHold() { if (!state.facilityDbId || !state.date || !(state.selectedHours && state.selectedHours.length)) return; var dateKey = toLocalDateKey(state.date); var slots = state.selectedHours.map(function (h) { return { start_time: (h % 24) + ':00', end_time: ((h + 1) % 24) + ':00' }; }); if (!state.holdToken) { state.holdToken = 'H' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); } fetch('/api/bookings?resource=hold', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ facility_id: state.facilityDbId, booking_date: dateKey, slots: slots, hold_token: state.holdToken }) }).catch(function (err) { console.error('Could not place slot hold:', err); }); }
 
-function initiatePayment() {
+function initiatePayment(mode) {
+   state.paymentMode = (mode === 'reserve') ? 'reserve' : 'full';
 var agreeBox = document.getElementById('agree-terms');
    if (agreeBox && !agreeBox.checked) {
       var wrap = document.getElementById('agree-terms-wrap');
@@ -522,6 +531,7 @@ function createRazorpayOrder() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
          facility_id: state.facilityId, booking_date: (state.date ? toLocalDateKey(state.date) : ''), hours: (state.selectedHours || []).slice(), promo_code: (state.promoCode || null), terms_accepted: true,
+         payment_mode: state.paymentMode || 'full',
          currency: 'INR',
          receipt: state.bookingId,
          notes: {
@@ -548,7 +558,7 @@ function createRazorpayOrder() {
       return res.json();
    }).then(function (data) {
       if (!data || !data.id) throw new Error('Invalid order response from server.');
-      state.razorpayOrderId = data.id; if (typeof data.amount === 'number') { state.totalAmount = data.amount / 100; var totalEl = document.getElementById('pay-total'); if (totalEl) totalEl.innerHTML = '<strong>₹' + state.totalAmount + '</strong>'; var payBtnAmount = document.getElementById('btnPayAmount'); if (payBtnAmount) payBtnAmount.textContent = '₹' + state.totalAmount; }
+      state.razorpayOrderId = data.id; if (typeof data.amount === 'number') { state.totalAmount = data.amount / 100; var totalEl = document.getElementById('pay-total'); if (totalEl) totalEl.innerHTML = '<strong>₹' + state.totalAmount + '</strong>'; var payBtnAmount = document.getElementById('btnPayAmount'); if (payBtnAmount) payBtnAmount.textContent = '₹' + state.totalAmount; } state.isReserve = !!data.is_reserve; state.fullAmount = (typeof data.full_amount === 'number') ? data.full_amount : state.totalAmount; state.reserveAmount = (typeof data.reserve_amount === 'number') ? data.reserve_amount : 0; state.balanceDue = (typeof data.balance_due === 'number') ? data.balance_due : 0;
       return data;
    });
 }
@@ -584,7 +594,7 @@ function openRazorpay() {
       amount: Math.round(state.totalAmount * 100),
       currency: 'INR',
       name: 'PlayBox Kashmir™',
-      description: state.facilityName + ' - ' + state.slotLabel + ' on ' + state.dateFormatted,
+      description: state.facilityName + ' - ' + state.slotLabel + ' on ' + state.dateFormatted + (state.isReserve ? ' (Reserve Payment)' : ''),
       image: 'https://playboxkashmir.com/assets/images/logo.png',
       order_id: state.razorpayOrderId,
       prefill: {
@@ -643,8 +653,9 @@ document.querySelectorAll('div').forEach(function (el) {
          '<div class="summary-row"><span class="label">Customer</span><span class="value">' + state.customerName + '</span></div>' +
          '<div class="summary-row"><span class="label">Email</span><span class="value">' + state.customerEmail + '</span></div>' +
          '<div class="summary-row"><span class="label">Amount Paid</span><span class="value" style="color:#15803d;font-weight:800;">₹' + state.totalAmount + '</span></div>' +
+         (state.isReserve ? '<div class="summary-row"><span class="label">Balance Due</span><span class="value" style="color:#b45309;font-weight:700;">₹' + state.balanceDue + '</span></div>' : '') +
          '<div class="summary-row"><span class="label">Payment ID</span><span class="value" style="font-family:monospace;">' + (paymentResponse.razorpay_payment_id || '') + '</span></div>' +
-         '<div class="summary-row"><span class="label">Status</span><span class="value" style="color:#10b981;">Confirmed</span></div>';
+         '<div class="summary-row"><span class="label">Status</span><span class="value" style="color:' + (state.isReserve ? '#b45309' : '#10b981') + ';">' + (state.isReserve ? 'Reserved - Pending Full Payment' : 'Confirmed') + '</span></div>';
    }
    goToStep(5);
 }
@@ -684,6 +695,11 @@ function resetBooking() {
       basePrice: 0,
       gstAmount: 0,
       totalAmount: 0,
+      paymentMode: 'full',
+      isReserve: false,
+      fullAmount: 0,
+      reserveAmount: 0,
+      balanceDue: 0,
       bookingId: null,
       reservationTimer: null,
       reservationSeconds: CONFIG.reservation_minutes * 60

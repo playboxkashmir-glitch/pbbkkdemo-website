@@ -271,10 +271,15 @@
           <label for="agree-terms">I agree to PlayBox Kashmir's <a href="privacy.html" target="_blank">Privacy Policy</a>, <a href="terms.html" target="_blank">Terms &amp; Conditions</a> and <a href="cancellation.html" target="_blank">Cancellation Policy</a>. <span class="req">*</span></label>
         </div>
 
-        <button class="btn-pay" id="btnPay" onclick="initiatePayment()">
+        <button class="btn-pay" id="btnPay" onclick="initiatePayment('full')">
           <i class="fas fa-lock"></i>
           Pay <span id="btnPayAmount">₹0</span> Securely
         </button>
+        <button class="btn-pay" id="btnReserve" onclick="initiatePayment('reserve')" style="margin-top:10px;background:#ffffff;color:#0F766E;border:2px solid #0F766E;">
+          <i class="fas fa-clock"></i>
+          Reserve for <span id="btnReserveAmount">₹0</span> Instead
+        </button>
+        <div class="payment-note" style="margin-top:4px;"><i class="fas fa-info-circle"></i> Reserve your slot now for just &#8377;500 + convenience fee, and pay the remaining balance later. Your slot is confirmed as soon as the reserve payment succeeds.</div>
 
         <div class="payment-note" style="margin-bottom:8px;"><i class="fas fa-shield-alt"></i> After clicking Pay, you'll be redirected to our secure payment gateway to complete the transaction.</div><div class="payment-note">
           <i class="fas fa-envelope"></i>
