@@ -435,12 +435,12 @@ function lookupReturningCustomer(email) { if (!email) return; fetch('/api/bookin
    const inaugRow = document.getElementById('inauguralRow'); if (inaugRow) { if (state.inauguralDiscount > 0) { inaugRow.style.display = 'flex'; const payInaugEl = document.getElementById('pay-inaugural'); if (payInaugEl) payInaugEl.textContent = '-₹' + state.inauguralDiscount; } else { inaugRow.style.display = 'none'; } }
    const gstEl = document.getElementById('pay-gst');
    if (gstEl) gstEl.textContent = '₹' + state.gstAmount;
-   const totalEl = document.getElementById('pay-total');
-   if (totalEl) totalEl.innerHTML = '<strong>₹' + state.totalAmount + '</strong>';
-   const payBtnAmount = document.getElementById('btnPayAmount');
-   if (payBtnAmount) payBtnAmount.textContent = '₹' + state.totalAmount;
-   var reserveBtnAmount = document.getElementById('btnReserveAmount'); if (reserveBtnAmount) reserveBtnAmount.textContent = '₹' + (CONFIG.reserve_amount + CONFIG.convenience_fee);
-   const discRow = document.getElementById('discountRow');
+   state.paymentMode = 'full';
+        var modeFullBtn = document.getElementById('modeFullBtn'); var modeReserveBtn = document.getElementById('modeReserveBtn');
+        if (modeFullBtn) modeFullBtn.classList.add('active');
+        if (modeReserveBtn) modeReserveBtn.classList.remove('active');
+        updatePaymentModeUI();
+     const discRow = document.getElementById('discountRow');
    if (discRow) {
       if (state.promoDiscount > 0) {
          discRow.style.display = 'flex';
@@ -458,6 +458,42 @@ upsellEl.style.display = (isPeakSlot && (state.selectedHours || []).length === 1
    startReservationTimer();
    createSlotHold();
 }
+function setPaymentMode(mode) {
+        state.paymentMode = (mode === 'reserve') ? 'reserve' : 'full';
+        var modeFullBtn = document.getElementById('modeFullBtn');
+        var modeReserveBtn = document.getElementById('modeReserveBtn');
+        if (modeFullBtn) modeFullBtn.classList.toggle('active', state.paymentMode === 'full');
+        if (modeReserveBtn) modeReserveBtn.classList.toggle('active', state.paymentMode === 'reserve');
+        updatePaymentModeUI();
+}
+
+function updatePaymentModeUI() {
+        var isReserveMode = state.paymentMode === 'reserve';
+        var reserveRow = document.getElementById('reservePriceRow');
+        var balanceRow = document.getElementById('balanceRow');
+        var reserveNote = document.getElementById('reserveHelperNote');
+        var totalLabel = document.getElementById('payTotalLabel');
+        var totalEl = document.getElementById('pay-total');
+        var payBtnAmount = document.getElementById('btnPayAmount');
+        var amountNow = state.totalAmount;
+        if (isReserveMode) {
+                   var reserveAmt = CONFIG.reserve_amount;
+                   var balance = Math.max(Math.round(((state.discountedSubtotal || 0) - reserveAmt) * 100) / 100, 0);
+                   amountNow = Math.round((reserveAmt + CONFIG.convenience_fee) * 100) / 100;
+                         if (reserveRow) { reserveRow.style.display = 'flex'; var prEl = document.getElementById('pay-reserve'); if (prEl) prEl.textContent = '₹' + reserveAmt; }
+                         if (balanceRow) { balanceRow.style.display = 'flex'; var pbEl = document.getElementById('pay-balance'); if (pbEl) pbEl.textContent = '₹' + balance; }
+                   if (reserveNote) reserveNote.style.display = 'flex';
+                   if (totalLabel) totalLabel.textContent = 'Total Payable Now';
+        } else {
+                   if (reserveRow) reserveRow.style.display = 'none';
+                   if (balanceRow) balanceRow.style.display = 'none';
+                   if (reserveNote) reserveNote.style.display = 'none';
+                   if (totalLabel) totalLabel.textContent = 'Total Payable';
+        }
+              if (totalEl) totalEl.innerHTML = '<strong>₹' + amountNow + '</strong>';
+              if (payBtnAmount) payBtnAmount.textContent = '₹' + amountNow;
+}
+
 
 function startReservationTimer() {
    const timerEl = document.getElementById('reservationTimer');

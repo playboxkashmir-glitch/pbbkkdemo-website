@@ -19,6 +19,7 @@
     .agree-terms .req{color:#ef4444;}
     #btnPay:disabled{opacity:.55;cursor:not-allowed;}
     .peak-upsell-banner{background:#fff7e6;border:1px solid #f5a623;color:#8a5a00;padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:14px;grid-column:1/-1;align-self:start;}.price-strike{text-decoration:line-through;color:#9ca3af;font-size:0.85em;margin-right:4px;}.price-now{color:#15803d;font-weight:700;}.offer-badge{display:inline-block;background:#15803d;color:#fff;font-size:0.7em;font-weight:700;padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle;}.inaugural-offer-note{background:#f0fdf4;border:1px solid #15803d;color:#15803d;padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:14px;font-weight:600;}.welcome-back-msg{display:flex;align-items:center;gap:8px;background:#e6f4ea;color:#1e7e34;border:1px solid #34a853;padding:8px 14px;border-radius:8px;margin-bottom:14px;font-size:14px;font-weight:600;}
+.payment-mode-toggle{display:flex;gap:8px;margin:14px 0 4px;background:#f3f4f6;padding:4px;border-radius:12px;}.payment-mode-toggle .mode-btn{flex:1;border:none;background:transparent;padding:10px 12px;border-radius:9px;font-size:0.9rem;font-weight:600;color:#6b7280;cursor:pointer;transition:all .2s;}.payment-mode-toggle .mode-btn.active{background:#15803d;color:#fff;box-shadow:0 2px 8px rgba(21,128,61,0.25);}.payment-mode-toggle .mode-btn:not(.active):hover{color:#15803d;}
   </style>
 </head>
 <body class="booking-page">
@@ -235,24 +236,37 @@
         <div id="finalSummary"></div>
 
         <div class="price-breakdown">
-          <div class="price-row">
-            <span>Turf Price</span>
-            <span id="pay-slot-price">₹0</span>
-          </div>
-          <div class="price-row" id="inauguralRow" style="display:none;"><span>Inaugural Offer (-15%)</span><span id="pay-inaugural" style="color:var(--success);">-₹0</span></div>
-          <div class="price-row discount-row" id="discountRow" style="display:none;">
-            <span>Promo Discount</span>
-            <span id="pay-discount" style="color:var(--success);">-₹0</span>
-          </div>
-          <div class="price-row tax-row">
-            <span>Convenience Fee</span>
-            <span id="pay-gst">₹0</span>
-          </div>
-          <div class="price-row total-row">
-            <span><strong>Total Payable</strong></span>
-            <span id="pay-total"><strong>₹0</strong></span>
-          </div>
+                    <div class="price-row">
+                                  <span>Turf Price</span>
+                                <span id="pay-slot-price">₹0</span>
+                    </div>
+                  <div class="price-row" id="inauguralRow" style="display:none;"><span>Inaugural Offer (-15%)</span><span id="pay-inaugural" style="color:var(--success);">-₹0</span></div>
+                  <div class="price-row discount-row" id="discountRow" style="display:none;">
+                              <span>Promo Discount</span>
+                              <span id="pay-discount" style="color:var(--success);">-₹0</span>
+                  </div>
+                  <div class="price-row" id="reservePriceRow" style="display:none;">
+                              <span>Reserve Price</span>
+                              <span id="pay-reserve">₹500</span>
+                  </div>
+                  <div class="price-row tax-row">
+                              <span>Convenience Fee</span>
+                              <span id="pay-gst">₹0</span>
+                  </div>
+                  <div class="price-row" id="balanceRow" style="display:none;">
+                              <span>Balance (Pay Later)</span>
+                              <span id="pay-balance">₹0</span>
+                  </div>
+                  <div class="price-row total-row">
+                              <span><strong id="payTotalLabel">Total Payable</strong></span>
+                              <span id="pay-total"><strong>₹0</strong></span>
+                  </div>
         </div>
+      
+              <div class="payment-mode-toggle" id="paymentModeToggle">
+                        <button type="button" class="mode-btn active" id="modeFullBtn" onclick="setPaymentMode('full')">Full Payment</button>
+                        <button type="button" class="mode-btn" id="modeReserveBtn" onclick="setPaymentMode('reserve')">Reserve ₹500</button>
+              </div>
       </div>
 
       <div class="payment-section">
@@ -271,16 +285,12 @@
           <label for="agree-terms">I agree to PlayBox Kashmir's <a href="privacy.html" target="_blank">Privacy Policy</a>, <a href="terms.html" target="_blank">Terms &amp; Conditions</a> and <a href="cancellation.html" target="_blank">Cancellation Policy</a>. <span class="req">*</span></label>
         </div>
 
-        <button class="btn-pay" id="btnPay" onclick="initiatePayment('full')">
-          <i class="fas fa-lock"></i>
-          Pay <span id="btnPayAmount">₹0</span> Securely
+        <button class="btn-pay" id="btnPay" onclick="initiatePayment(state.paymentMode)">
+                    <i class="fas fa-lock"></i>
+                    Pay <span id="btnPayAmount">₹0</span> Securely
         </button>
-        <button class="btn-pay" id="btnReserve" onclick="initiatePayment('reserve')" style="margin-top:10px;background:#ffffff;color:#0F766E;border:2px solid #0F766E;">
-          <i class="fas fa-clock"></i>
-          Reserve for <span id="btnReserveAmount">₹0</span> Instead
-        </button>
-        <div class="payment-note" style="margin-top:4px;"><i class="fas fa-info-circle"></i> Reserve your slot now for just &#8377;500 + convenience fee, and pay the remaining balance later. Your slot is confirmed as soon as the reserve payment succeeds.</div>
-
+                <div class="payment-note" id="reserveHelperNote" style="margin-top:4px;display:none;"><i class="fas fa-info-circle"></i> Reserve your slot now for just &#8377;500 + convenience fee, and pay the remaining balance later. Your slot is confirmed as soon as the reserve payment succeeds.</div>
+        
         <div class="payment-note" style="margin-bottom:8px;"><i class="fas fa-shield-alt"></i> After clicking Pay, you'll be redirected to our secure payment gateway to complete the transaction.</div><div class="payment-note">
           <i class="fas fa-envelope"></i>
           Confirmation email will be sent immediately after payment.
