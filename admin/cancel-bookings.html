@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cancel Booking &ndash; PlayBox Kashmir Admin</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="admin.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+.pk-empty,.pk-loading{text-align:center;color:#9ca3af;padding:2rem;}
+.pk-filter-bar{display:flex;align-items:flex-end;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem;}
+.pk-filter-group{display:flex;flex-direction:column;gap:0.3rem;}
+.pk-filter-group label{font-size:0.75rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.03em;}
+.pk-filter-group input,.pk-filter-group select{padding:0.5rem 0.65rem;border:1px solid #e5e7eb;border-radius:6px;font-family:inherit;font-size:0.85rem;color:#111827;min-width:150px;}
+.pk-filter-btn{padding:0.55rem 1rem;border-radius:6px;border:none;font-weight:600;font-size:0.85rem;cursor:pointer;}
+.pk-filter-apply{background:#1a56db;color:#fff;}
+.pk-filter-clear{background:#f3f4f6;color:#374151;}
+.pk-details-row{display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #f3f4f6;font-size:0.9rem;}
+.pk-details-row span:first-child{color:#6b7280;}
+.pk-details-row span:last-child{color:#111827;font-weight:600;text-align:right;}
+.reason-options{display:flex;flex-direction:column;gap:0.6rem;margin:0.75rem 0 1.25rem;}
+.reason-option{display:flex;align-items:flex-start;gap:0.6rem;padding:0.75rem;border:1px solid #e5e7eb;border-radius:8px;cursor:pointer;}
+.reason-option input{margin-top:0.2rem;}
+.reason-option.selected{border-color:#1a56db;background:#eff4ff;}
+.reason-option strong{display:block;font-size:0.9rem;color:#111827;}
+.reason-option .desc{display:block;font-size:0.8rem;color:#6b7280;}
+.refund-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:1rem;margin-top:0.5rem;}
+.refund-box .refund-amount{font-size:1.4rem;font-weight:800;color:#059669;}
+.refund-box.no-refund .refund-amount{color:#dc2626;}
+.refund-box p{font-size:0.8rem;color:#6b7280;margin-top:0.35rem;}
+.form-group textarea{width:100%;padding:0.6rem;border:1px solid #e5e7eb;border-radius:6px;font-family:inherit;font-size:0.85rem;resize:vertical;}
+.btn-danger{background:#dc2626;color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:6px;font-weight:600;cursor:pointer;}
+.btn-danger:disabled{opacity:0.6;cursor:not-allowed;}
+</style>
+</head>
+<body class="admin-body">
+
+<aside class="admin-sidebar" id="adminSidebar">
+<div class="sidebar-brand">
+<span class="logo-play">Play</span><span class="logo-box">Box</span>
+</div>
+<nav class="sidebar-nav">
+<a href="dashboard.html" class="sidebar-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+<a href="bookings.html" class="sidebar-link"><i class="fas fa-calendar-check"></i> Bookings</a>
+<a href="cancel-bookings.html" class="sidebar-link active"><i class="fas fa-ban"></i> Cancel Booking</a>
+<a href="calendar.html" class="sidebar-link"><i class="fas fa-calendar-alt"></i> Calendar View</a>
+<a href="customers.html" class="sidebar-link"><i class="fas fa-users"></i> Customers</a>
+<a href="facilities.html" class="sidebar-link"><i class="fas fa-building"></i> Facilities</a>
+<a href="pricing.html" class="sidebar-link"><i class="fas fa-tags"></i> Pricing</a>
+<a href="promos.html" class="sidebar-link"><i class="fas fa-percentage"></i> Promo Codes</a>
+<a href="reports.html" class="sidebar-link"><i class="fas fa-chart-bar"></i> Reports</a>
+<a href="settings.html" class="sidebar-link"><i class="fas fa-cog"></i> Settings</a>
+<div class="sidebar-divider"></div>
+<a href="../index.html" class="sidebar-link" target="_blank"><i class="fas fa-external-link-alt"></i> View Website</a>
+<a href="login.html" class="sidebar-link logout" onclick="handleLogout(event)"><i class="fas fa-sign-out-alt"></i> Logout</a>
+</nav>
+</aside>
+
+<main class="admin-main">
+<header class="admin-header">
+<button class="sidebar-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+<div class="header-title">
+<h1>Cancel Booking</h1>
+<p>Cancel upcoming bookings and automatically notify customers by email</p>
+</div>
+<div class="header-actions">
+<div class="header-date" id="headerDate"></div>
+</div>
+</header>
+
+<div style="padding:2rem;">
+<div class="admin-card">
+<div class="pk-filter-bar">
+<div class="pk-filter-group">
+<label>From</label>
+<input type="date" id="filterFrom">
+</div>
+<div class="pk-filter-group">
+<label>To</label>
+<input type="date" id="filterTo">
+</div>
+<div class="pk-filter-group">
+<label>Search</label>
+<input type="text" id="filterSearch" placeholder="Name, phone or ref">
+</div>
+<button class="pk-filter-btn pk-filter-apply" onclick="applyFilters()">Apply Filters</button>
+<button class="pk-filter-btn pk-filter-clear" onclick="clearFilters()">Clear</button>
+</div>
+<div class="bookings-table-wrap">
+<table class="bookings-table">
+<thead>
+<tr>
+<th>Booking Ref</th>
+<th>Customer</th>
+<th>Facility</th>
+<th>Date</th>
+<th>Time</th>
+<th>Amount</th>
+<th>Payment</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="upcomingBookingsTable">
+<tr><td colspan="8" class="pk-loading">Loading bookings...</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+
+<div class="modal-overlay" id="cancelBookingModal" style="display:none;">
+<div class="admin-modal">
+<div class="modal-header">
+<h3>Cancel Booking</h3>
+<button class="modal-close-btn" onclick="closeCancelModal()"><i class="fas fa-times"></i></button>
+</div>
+<div class="modal-body" style="padding:1.5rem;" id="cancelModalBody"></div>
+<div class="modal-footer">
+<button class="btn-cancel" onclick="closeCancelModal()">Close</button>
+<button class="btn-danger" id="confirmCancelBtn" onclick="submitCancellation()">Confirm Cancellation</button>
+</div>
+</div>
+</div>
+
+<script src="admin.js"></script>
+<script>
+let upcomingBookingsCache = [];
+let selectedBooking = null;
+let selectedReason = 'user_requested';
+
+document.addEventListener('DOMContentLoaded', function () {
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('filterFrom').value = today;
+  loadUpcomingBookings();
+});
+
+function buildUpcomingQuery() {
+  const from = document.getElementById('filterFrom').value;
+  const to = document.getElementById('filterTo').value;
+  const params = [];
+  if (from) params.push('from=' + from);
+  if (to) params.push('to=' + to);
+  return params.length ? ('?' + params.join('&')) : '';
+}
+
+function slotEndMillis(bookingDate, endTime) {
+  const dateStr = String(bookingDate).slice(0, 10);
+  const timeStr = String(endTime).slice(0, 5);
+  const parts = dateStr.split('-').map(Number);
+  const timeParts = timeStr.split(':').map(Number);
+  return Date.UTC(parts[0], parts[1] - 1, parts[2], timeParts[0], timeParts[1]) - (5.5 * 60 * 60 * 1000);
+}
+
+function hoursUntilSlot(bookingDate, startTime) {
+  const dateStr = String(bookingDate).slice(0, 10);
+  const timeStr = String(startTime).slice(0, 5);
+  const parts = dateStr.split('-').map(Number);
+  const timeParts = timeStr.split(':').map(Number);
+  const istMillis = Date.UTC(parts[0], parts[1] - 1, parts[2], timeParts[0], timeParts[1]) - (5.5 * 60 * 60 * 1000);
+  return (istMillis - Date.now()) / (1000 * 60 * 60);
+}
+
+async function loadUpcomingBookings() {
+  const tbody = document.getElementById('upcomingBookingsTable');
+  tbody.innerHTML = '<tr><td colspan="8" class="pk-loading">Loading bookings...</td></tr>';
+  try {
+    const res = await fetch('/api/bookings' + buildUpcomingQuery(), { credentials: 'include' });
+    if (!res.ok) { tbody.innerHTML = '<tr><td colspan="8" class="pk-empty">Failed to load bookings.</td></tr>'; return; }
+    const data = await res.json();
+    const now = Date.now();
+    const all = data.bookings || [];
+    upcomingBookingsCache = all.filter(function (b) {
+      if (b.status === 'cancelled') return false;
+      return slotEndMillis(b.booking_date, b.end_time) > now;
+    }).sort(function (a, b) {
+      return slotEndMillis(a.booking_date, a.end_time) - slotEndMillis(b.booking_date, b.end_time);
+    });
+    renderUpcomingTable();
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="8" class="pk-empty">Failed to load bookings.</td></tr>';
+  }
+}
+
+function renderUpcomingTable() {
+  const tbody = document.getElementById('upcomingBookingsTable');
+  const search = document.getElementById('filterSearch').value.trim().toLowerCase();
+  let list = upcomingBookingsCache;
+  if (search) {
+    list = list.filter(function (b) {
+      return (b.customer_name || '').toLowerCase().includes(search) ||
+        (b.customer_phone || '').toLowerCase().includes(search) ||
+        (b.booking_ref || '').toLowerCase().includes(search);
+    });
+  }
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="pk-empty">No upcoming bookings found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(renderUpcomingRow).join('');
+}
+
+function renderUpcomingRow(b) {
+  const initial = (b.customer_name || '?').charAt(0).toUpperCase();
+  const dateLabel = b.booking_date ? new Date(b.booking_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
+  const paymentLabel = b.payment_method === 'razorpay' ? 'Online' : 'Cash';
+  return '<tr>' +
+    '<td><code>' + escapeHtml(b.booking_ref) + '</code></td>' +
+    '<td><div class="customer-cell"><div class="customer-avatar">' + initial + '</div><div>' +
+    '<div class="customer-name">' + escapeHtml(b.customer_name) + '</div>' +
+    '<div class="customer-contact">' + escapeHtml(b.customer_phone) + '</div>' +
+    '</div></div></td>' +
+    '<td><span class="facility-tag">' + escapeHtml(b.option_name) + '</span></td>' +
+    '<td>' + dateLabel + '</td>' +
+    '<td>' + formatTimeLabel(b.start_time) + ' - ' + formatTimeLabel(b.end_time) + '</td>' +
+    '<td class="amount">' + formatCurrency(b.amount) + '</td>' +
+    '<td>' + paymentLabel + '</td>' +
+    '<td><button class="btn-icon danger" title="Cancel Booking" onclick="openCancelModal(' + b.id + ')"><i class="fas fa-ban"></i></button></td>' +
+    '</tr>';
+}
+
+function applyFilters() {
+  loadUpcomingBookings();
+}
+
+function clearFilters() {
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('filterFrom').value = today;
+  document.getElementById('filterTo').value = '';
+  document.getElementById('filterSearch').value = '';
+  loadUpcomingBookings();
+}
+
+function openCancelModal(id) {
+  const b = upcomingBookingsCache.find(function (x) { return x.id === id; });
+  if (!b) return;
+  selectedBooking = b;
+  selectedReason = 'user_requested';
+  renderCancelModalBody();
+  document.getElementById('cancelBookingModal').style.display = 'flex';
+}
+
+function closeCancelModal() {
+  document.getElementById('cancelBookingModal').style.display = 'none';
+  selectedBooking = null;
+}
+
+function setReason(reason) {
+  selectedReason = reason;
+  renderCancelModalBody();
+}
+
+function computeRefundEstimate(b, reason) {
+  const isOnline = b.payment_method === 'razorpay';
+  const paid = parseFloat(b.amount_paid || b.amount || 0);
+  if (!isOnline) {
+    return { amount: 0, note: 'This booking was paid in cash/offline, so no automatic refund applies. Any refund must be coordinated manually.' };
+  }
+  if (reason === 'playbox_cancellation') {
+    return { amount: paid, note: 'PlayBox-initiated cancellation: the full amount paid (excluding any non-refundable convenience fee) will be refunded.' };
+  }
+  const hrs = hoursUntilSlot(b.booking_date, b.start_time);
+  if (hrs > 24) {
+    return { amount: paid, note: 'More than 24 hours before the slot: 100% refund (excluding any non-refundable convenience fee), as per our Cancellation & Refund Policy.' };
+  } else if (hrs > 12) {
+    return { amount: Math.round(paid * 0.5 * 100) / 100, note: '12-24 hours before the slot: 50% refund (excluding any non-refundable convenience fee), as per our Cancellation & Refund Policy.' };
+  }
+  return { amount: 0, note: 'Less than 12 hours before the slot: no refund applies, as per our Cancellation & Refund Policy.' };
+}
+
+function renderCancelModalBody() {
+  const b = selectedBooking;
+  const dateLabel = b.booking_date ? new Date(b.booking_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
+  const paymentLabel = b.payment_method === 'razorpay' ? 'Online (Razorpay)' : 'Cash';
+  const estimate = computeRefundEstimate(b, selectedReason);
+  const refundClass = estimate.amount > 0 ? 'refund-box' : 'refund-box no-refund';
+  const body = document.getElementById('cancelModalBody');
+  body.innerHTML =
+    '<div class="pk-details-row"><span>Booking Ref</span><span>' + escapeHtml(b.booking_ref) + '</span></div>' +
+    '<div class="pk-details-row"><span>Customer</span><span>' + escapeHtml(b.customer_name) + '</span></div>' +
+    '<div class="pk-details-row"><span>Facility</span><span>' + escapeHtml(b.option_name) + '</span></div>' +
+    '<div class="pk-details-row"><span>Date &amp; Time</span><span>' + dateLabel + ', ' + formatTimeLabel(b.start_time) + ' - ' + formatTimeLabel(b.end_time) + '</span></div>' +
+    '<div class="pk-details-row"><span>Amount Paid</span><span>' + formatCurrency(b.amount_paid || b.amount) + '</span></div>' +
+    '<div class="pk-details-row"><span>Payment Mode</span><span>' + paymentLabel + '</span></div>' +
+    '<div class="reason-options">' +
+    '<label class="reason-option' + (selectedReason === 'user_requested' ? ' selected' : '') + '">' +
+    '<input type="radio" name="cancelReason" value="user_requested"' + (selectedReason === 'user_requested' ? ' checked' : '') + ' onchange="setReason(&#39;user_requested&#39;)">' +
+    '<span><strong>User Requested Cancellation</strong><span class="desc">The customer asked to cancel this booking.</span></span>' +
+    '</label>' +
+    '<label class="reason-option' + (selectedReason === 'playbox_cancellation' ? ' selected' : '') + '">' +
+    '<input type="radio" name="cancelReason" value="playbox_cancellation"' + (selectedReason === 'playbox_cancellation' ? ' checked' : '') + ' onchange="setReason(&#39;playbox_cancellation&#39;)">' +
+    '<span><strong>PlayBox Side Cancellation</strong><span class="desc">PlayBox Kashmir needs to cancel this booking (maintenance, weather, scheduling conflict, etc.).</span></span>' +
+    '</label>' +
+    '</div>' +
+    '<div class="form-group"><label>Internal Notes (optional)</label><textarea id="cancelNotes" rows="2" placeholder="Any additional context for this cancellation"></textarea></div>' +
+    '<div class="' + refundClass + '" id="refundEstimateBox">' +
+    '<div>Approximate Refund</div>' +
+    '<div class="refund-amount">' + formatCurrency(estimate.amount) + '</div>' +
+    '<p>' + escapeHtml(estimate.note) + '</p>' +
+    '</div>';
+}
+
+async function submitCancellation() {
+  if (!selectedBooking) return;
+  const notes = document.getElementById('cancelNotes').value.trim();
+  const btn = document.getElementById('confirmCancelBtn');
+  btn.disabled = true;
+  btn.textContent = 'Cancelling...';
+  try {
+    const res = await fetch('/api/bookings?resource=cancel', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: selectedBooking.id, reason: selectedReason, notes: notes })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'Could not cancel booking.');
+      btn.disabled = false;
+      btn.textContent = 'Confirm Cancellation';
+      return;
+    }
+    let msg = 'Booking cancelled. Approximate refund: ' + formatCurrency(data.refund_amount) + '.';
+    msg += data.email_sent ? ' A cancellation email has been sent to the customer.' : ' Note: the cancellation email could not be sent automatically; please follow up with the customer directly.';
+    alert(msg);
+    closeCancelModal();
+    await loadUpcomingBookings();
+  } catch (err) {
+    alert('Network error. Please try again.');
+    btn.disabled = false;
+    btn.textContent = 'Confirm Cancellation';
+  }
+}
+</script>
+</body>
+</html>
