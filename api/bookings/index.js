@@ -10,7 +10,7 @@
 // /api/bookings?resource=send-confirmation       (POST send confirmation email - admin only)
 import { query } from '../../lib/db.js';
 import { requireAuth } from '../../lib/auth.js';
-import { sendBookingConfirmationEmail } from '../../lib/email.js'; const lookupAttempts = new Map(); const LOOKUP_WINDOW_MS = 10 * 60 * 1000; const LOOKUP_MAX_REQUESTS = 8; function getClientIp(req) { const fwd = req.headers['x-forwarded-for']; if (fwd) return String(fwd).split(',')[0].trim(); return (req.socket && req.socket.remoteAddress) || 'unknown'; } function isLookupRateLimited(ip) { const now = Date.now(); if (lookupAttempts.size > 5000) { for (const [key, entry] of lookupAttempts) { if (now - entry.windowStart > LOOKUP_WINDOW_MS) lookupAttempts.delete(key); } } const entry = lookupAttempts.get(ip); if (!entry || now - entry.windowStart > LOOKUP_WINDOW_MS) { lookupAttempts.set(ip, { count: 1, windowStart: now }); return false; } entry.count += 1; return entry.count > LOOKUP_MAX_REQUESTS; }
+import { sendBookingConfirmationEmail, sendBookingCancellationEmail } from '../../lib/email.js'; const lookupAttempts = new Map(); const LOOKUP_WINDOW_MS = 10 * 60 * 1000; const LOOKUP_MAX_REQUESTS = 8; function getClientIp(req) { const fwd = req.headers['x-forwarded-for']; if (fwd) return String(fwd).split(',')[0].trim(); return (req.socket && req.socket.remoteAddress) || 'unknown'; } function isLookupRateLimited(ip) { const now = Date.now(); if (lookupAttempts.size > 5000) { for (const [key, entry] of lookupAttempts) { if (now - entry.windowStart > LOOKUP_WINDOW_MS) lookupAttempts.delete(key); } } const entry = lookupAttempts.get(ip); if (!entry || now - entry.windowStart > LOOKUP_WINDOW_MS) { lookupAttempts.set(ip, { count: 1, windowStart: now }); return false; } entry.count += 1; return entry.count > LOOKUP_MAX_REQUESTS; }
 
 function generateBookingRef() {
   const ts = Date.now().toString(36).toUpperCase();
@@ -34,6 +34,9 @@ const user = await requireAuth(req, res);
 const { id } = req.query;
   if (resource === 'send-confirmation') {
     return handleSendConfirmation(req, res);
+  }
+  if (resource === 'cancel') {
+    return handleCancelBooking(req, res, user);
   }
   if (id) {
     return handleSingle(req, res);
@@ -252,3 +255,100 @@ async function handleSendConfirmation(req, res) {
     return res.status(500).json({ error: 'Failed to send confirmation email. Check SMTP configuration.' });
   }
 }
+
+async function handleCancelBooking(req, res, user) {
+    if (req.method !== 'POST') {
+          res.setHeader('Allow', 'POST');
+          return res.status(405).json({ error: 'Method not allowed' });
+    }
+    try {
+          const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+          const { id, reason, notes } = body;
+          if (!id) {
+                  return res.status(400).json({ error: 'Booking id is required.' });
+          }
+          if (reason !== 'user_requested' && reason !== 'playbox_cancellation') {
+                  return res.status(400).json({ error: 'A valid cancellation reason is required.' });
+          }
+          const rows = await query('SELECT b.*, f.option_name, f.sport_name FROM bookings b JOIN facilities f ON f.id=b.facility_id WHERE b.id = $1', [id]);
+          const booking = rows.rows[0];
+          if (!booking) {
+                  return res.status(404).json({ error: 'Booking not found.' });
+          }
+          if (booking.status === 'cancelled') {
+                  return res.status(400).json({ error: 'This booking is already cancelled.' });
+          }
+
+          const settingsRows = await query("SELECT key, value FROM settings WHERE key = 'convenience_fee'");
+          let convenienceFee = 0;
+          settingsRows.rows.forEach(function (row) {
+                  if (row.key === 'convenience_fee') {
+                            const fee = parseFloat(row.value);
+                            if (!isNaN(fee)) convenienceFee = fee;
+                  }
+          });
+
+          const isOnline = booking.payment_method === 'razorpay';
+          const paidAmount = parseFloat(booking.amount_paid || 0);
+          const refundableBase = Math.max(0, paidAmount - convenienceFee);
+
+          let refundAmount = 0;
+          let refundNote = '';
+
+          if (!isOnline) {
+                  refundAmount = 0;
+                  refundNote = 'This booking was paid in cash/offline, so no automatic refund applies. Please contact us directly if a refund is due.';
+          } else if (reason === 'playbox_cancellation') {
+                  refundAmount = refundableBase;
+                  refundNote = 'As this booking was cancelled by PlayBox Kashmir, the full amount paid (excluding the non-refundable convenience fee) will be refunded.';
+          } else {
+                  const hoursUntilSlot = computeHoursUntilSlot(booking.booking_date, booking.start_time);
+                  if (hoursUntilSlot >= 24) {
+                            refundAmount = refundableBase;
+                            refundNote = 'Cancelled more than 24 hours before the scheduled slot: 100% of the amount paid (excluding the non-refundable convenience fee) is refunded, as per our Cancellation & Refund Policy.';
+                  } else if (hoursUntilSlot >= 12) {
+                            refundAmount = refundableBase * 0.5;
+                            refundNote = 'Cancelled between 12-24 hours before the scheduled slot: 50% of the amount paid (excluding the non-refundable convenience fee) is refunded, as per our Cancellation & Refund Policy.';
+                  } else {
+                            refundAmount = 0;
+                            refundNote = 'Cancelled less than 12 hours before the scheduled slot: as per our Cancellation & Refund Policy, no refund applies.';
+                  }
+          }
+
+          refundAmount = Math.round(refundAmount * 100) / 100;
+
+          const updateRows = await query(
+                  `UPDATE bookings SET status='cancelled', cancellation_reason=$1, cancellation_notes=$2, refund_amount=$3, cancelled_at=now(), cancelled_by=$4, updated_at=now() WHERE id=$5 RETURNING *`,
+                  [reason, notes || null, refundAmount, (user && user.username) || 'admin', id]
+                );
+          const updated = Object.assign({}, updateRows.rows[0], { option_name: booking.option_name, sport_name: booking.sport_name });
+
+          let emailSent = false;
+          let emailError = null;
+          try {
+                  await sendBookingCancellationEmail(updated, { reason: reason, notes: notes, refundAmount: refundAmount, refundNote: refundNote });
+                  emailSent = true;
+                  await query('UPDATE bookings SET cancellation_email_sent_at = now() WHERE id = $1', [id]);
+          } catch (err) {
+                  console.error('Cancellation email error:', err);
+                  emailError = err.message;
+          }
+
+          return res.status(200).json({ booking: updated, refund_amount: refundAmount, email_sent: emailSent, email_error: emailError });
+    } catch (err) {
+          console.error('Cancel booking error:', err);
+          return res.status(500).json({ error: 'Server error while cancelling booking.' });
+    }
+}
+
+// Computes hours remaining until a booking's scheduled start, treating the
+// stored date/time as IST (UTC+5:30) wall-clock values (India has no DST).
+function computeHoursUntilSlot(bookingDate, startTime) {
+    const dateStr = String(bookingDate).slice(0, 10);
+    const timeStr = String(startTime).slice(0, 5);
+    const parts = dateStr.split('-').map(Number);
+    const timeParts = timeStr.split(':').map(Number);
+    const istMillis = Date.UTC(parts[0], parts[1] - 1, parts[2], timeParts[0], timeParts[1]) - (5.5 * 60 * 60 * 1000);
+    return (istMillis - Date.now()) / (1000 * 60 * 60);
+}
+
