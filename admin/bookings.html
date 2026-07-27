@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bookings â PlayBox Kashmir Admin</title>
+<title>Bookings – PlayBox Kashmir Admin</title>
 <link rel="stylesheet" href="../assets/css/style.css">
 <link rel="stylesheet" href="admin.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -242,7 +242,7 @@ function renderBookingsTable() {
 function renderRow(b) {
   const initial = (b.customer_name || '?').charAt(0).toUpperCase();
   const statusClass = b.status === 'confirmed' ? 'confirmed' : (b.status === 'cancelled' ? 'cancelled' : 'reserved');
-  const dateLabel = b.booking_date ? new Date(b.booking_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'â';
+  const dateLabel = b.booking_date ? new Date(b.booking_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
   return '<tr>' +
     '<td><code>' + escapeHtml(b.booking_ref) + '</code></td>' +
     '<td><div class="customer-cell"><div class="customer-avatar">' + initial + '</div><div>' +
@@ -251,7 +251,7 @@ function renderRow(b) {
     '</div></div></td>' +
     '<td><span class="facility-tag">' + escapeHtml(b.option_name) + '</span></td>' +
     '<td>' + dateLabel + '</td>' +
-    '<td>' + formatTimeLabel(b.start_time) + ' â ' + formatTimeLabel(b.end_time) + '</td>' +
+    '<td>' + formatTimeLabel(b.start_time) + ' – ' + formatTimeLabel(b.end_time) + '</td>' +
     '<td class="amount">' + formatCurrency(b.amount) + '</td>' +
     '<td><span class="status-badge ' + statusClass + '">' + capitalize(b.status) + '</span></td>' +
     '<td>' +
@@ -276,7 +276,7 @@ function clearFilters() {
 function viewBooking(id) {
   const b = allBookingsCache.find(x => x.id === id);
   if (!b) return;
-  const dateLabel = b.booking_date ? new Date(b.booking_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'â';
+  const dateLabel = b.booking_date ? new Date(b.booking_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
   const rows = [
     ['Booking Ref', b.booking_ref],
     ['Customer', b.customer_name],
@@ -284,11 +284,11 @@ function viewBooking(id) {
     ['Email', b.customer_email],
     ['Facility', b.option_name + ' (' + b.sport_name + ')'],
     ['Date', dateLabel],
-    ['Time', formatTimeLabel(b.start_time) + ' â ' + formatTimeLabel(b.end_time)],
+    ['Time', formatTimeLabel(b.start_time) + ' – ' + formatTimeLabel(b.end_time)],
     ['Amount', formatCurrency(b.amount)],
     ['Payment Method', capitalize(b.payment_method || '')],
     ['Status', capitalize(b.status)],
-    ['Notes', b.notes || 'â']
+    ['Notes', b.notes || '—']
   ];
   document.getElementById('bookingDetailsBody').innerHTML = rows.map(r =>
     '<div class="pk-details-row"><span>' + escapeHtml(r[0]) + '</span><span>' + escapeHtml(String(r[1] || '')) + '</span></div>'
