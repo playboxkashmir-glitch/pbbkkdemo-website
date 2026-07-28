@@ -55,6 +55,7 @@
 </div>
 <div class="header-actions">
 <div class="header-date" id="headerDate"></div>
+<button class="btn-add-booking" style="background:#374151;" onclick="showExportModal()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>Export</button>
 <button class="btn-add-booking" onclick="showAddBookingModal()"><i class="fas fa-plus"></i> Add Booking</button>
 </div>
 </header>
@@ -188,6 +189,58 @@
 </div>
 </div>
 
+
+<div class="modal-overlay" id="exportBookingsModal" style="display:none;">
+<div class="admin-modal">
+<div class="modal-header">
+<h3>Export Bookings</h3>
+<button class="modal-close-btn" onclick="closeExportModal()">&times;</button>
+</div>
+<div class="modal-body">
+<p style="color:#6b7280;font-size:0.85rem;margin-top:0;">Leave dates blank to export all bookings, or pick a quick range below.</p>
+<div class="form-grid">
+<div class="form-group">
+<label>Date Range</label>
+<select id="exportRangePreset" onchange="onExportRangePresetChange()">
+<option value="custom">Custom Range</option>
+<option value="current_month">Current Month</option>
+<option value="last_month">Last Month</option>
+<option value="last_3_months">Last 3 Months</option>
+<option value="last_6_months">Last 6 Months</option>
+</select>
+</div>
+<div class="form-group">
+<label>From</label>
+<input type="date" id="exportFrom">
+</div>
+<div class="form-group">
+<label>To</label>
+<input type="date" id="exportTo">
+</div>
+<div class="form-group">
+<label>Turf Type</label>
+<select id="exportTurfType">
+<option value="">All</option>
+</select>
+</div>
+<div class="form-group">
+<label>Payment Mode</label>
+<select id="exportPaymentMode">
+<option value="">All</option>
+<option value="online">Online</option>
+<option value="offline">Offline</option>
+</select>
+</div>
+</div>
+</div>
+<div class="modal-footer">
+<button class="btn-cancel" onclick="closeExportModal()">Close</button>
+<button class="btn-confirm" onclick="exportBookingsCsv()">Download CSV</button>
+<button class="btn-confirm" onclick="exportBookingsPdf()">Export PDF</button>
+</div>
+</div>
+</div>
+
 <script src="admin.js"></script>
 <script>
 let allBookingsCache = [];
@@ -255,8 +308,7 @@ function renderRow(b) {
     '<td class="amount">' + formatCurrency(b.amount) + '</td>' +
     '<td><span class="status-badge ' + statusClass + '">' + capitalize(b.status) + '</span></td>' +
     '<td>' +
-    '<button class="btn-icon" title="View" onclick="viewBooking(' + b.id + ')"><i class="fas fa-eye"></i></button>' +
-    (b.status !== 'cancelled' ? '<button class="btn-icon danger" title="Cancel" onclick="cancelBooking(' + b.id + ')"><i class="fas fa-ban"></i></button>' : '') +
+    '<button class="btn-icon" title="View" style="display:inline-flex;align-items:center;justify-content:center;" onclick="viewBooking(' + b.id + ')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>' +
     '</td>' +
     '</tr>';
 }
@@ -300,15 +352,155 @@ function closeBookingDetailsModal() {
   document.getElementById('bookingDetailsModal').style.display = 'none';
 }
 
-async function cancelBooking(id) {
-  if (!confirm('Cancel this booking? This cannot be undone.')) return;
-  try {
-    const res = await fetch('/api/bookings?id=' + id, { method: 'DELETE', credentials: 'include' });
-    if (!res.ok) { alert('Could not cancel booking.'); return; }
-    await loadBookingsList();
-  } catch (err) {
-    alert('Network error. Please try again.');
+function showExportModal() {
+  document.getElementById('exportRangePreset').value = 'custom';
+  document.getElementById('exportFrom').value = '';
+  document.getElementById('exportTo').value = '';
+  document.getElementById('exportPaymentMode').value = '';
+  document.getElementById('exportBookingsModal').style.display = 'flex';
+  populateExportTurfOptions();
+}
+
+function closeExportModal() {
+  document.getElementById('exportBookingsModal').style.display = 'none';
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function toDateStr(d) {
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+}
+
+function onExportRangePresetChange() {
+  const preset = document.getElementById('exportRangePreset').value;
+  const now = new Date();
+  let from = null, to = null;
+  if (preset === 'current_month') {
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+    to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else if (preset === 'last_month') {
+    from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    to = new Date(now.getFullYear(), now.getMonth(), 0);
+  } else if (preset === 'last_3_months') {
+    from = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else if (preset === 'last_6_months') {
+    from = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else {
+    document.getElementById('exportFrom').value = '';
+    document.getElementById('exportTo').value = '';
+    return;
   }
+  document.getElementById('exportFrom').value = toDateStr(from);
+  document.getElementById('exportTo').value = toDateStr(to);
+}
+
+async function populateExportTurfOptions() {
+  const sel = document.getElementById('exportTurfType');
+  const currentVal = sel.value;
+  try {
+    const res = await fetch('/api/bookings', { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const list = data.bookings || [];
+    const types = [...new Set(list.map(b => b.sport_name).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">All</option>' + types.map(t => '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>').join('');
+    sel.value = currentVal;
+  } catch (err) {
+    /* keep default All option */
+  }
+}
+
+async function fetchBookingsForExport() {
+  const from = document.getElementById('exportFrom').value;
+  const to = document.getElementById('exportTo').value;
+  const turfType = document.getElementById('exportTurfType').value;
+  const paymentMode = document.getElementById('exportPaymentMode').value;
+  let url = '/api/bookings';
+  const params = [];
+  if (from) params.push('from=' + from);
+  if (to) params.push('to=' + to);
+  if (params.length) url += '?' + params.join('&');
+  const res = await fetch(url, { credentials: 'include' });
+  if (!res.ok) { alert('Failed to fetch bookings for export.'); return null; }
+  const data = await res.json();
+  let list = data.bookings || [];
+  if (turfType) list = list.filter(b => b.sport_name === turfType);
+  if (paymentMode === 'online') list = list.filter(b => b.payment_method === 'razorpay');
+  if (paymentMode === 'offline') list = list.filter(b => b.payment_method !== 'razorpay');
+  return list;
+}
+
+function csvEscape(val) {
+  const s = String(val === null || val === undefined ? '' : val);
+  if (/["\n,]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+async function exportBookingsCsv() {
+  const list = await fetchBookingsForExport();
+  if (!list) return;
+  if (!list.length) { alert('No bookings found for the selected filters.'); return; }
+  const headers = ['Booking Ref','Customer Name','Phone','Email','Facility','Turf Type','Date','Start Time','End Time','Amount','Payment Method','Status'];
+  const rows = list.map(b => [
+    b.booking_ref,
+    b.customer_name,
+    b.customer_phone,
+    b.customer_email,
+    b.option_name,
+    b.sport_name,
+    b.booking_date,
+    formatTimeLabel(b.start_time),
+    formatTimeLabel(b.end_time),
+    b.amount,
+    b.payment_method,
+    b.status
+  ]);
+  let csv = headers.map(csvEscape).join(',') + '\n';
+  csv += rows.map(r => r.map(csvEscape).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'playbox-bookings-' + toDateStr(new Date()) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function exportBookingsPdf() {
+  const list = await fetchBookingsForExport();
+  if (!list) return;
+  if (!list.length) { alert('No bookings found for the selected filters.'); return; }
+  const from = document.getElementById('exportFrom').value;
+  const to = document.getElementById('exportTo').value;
+  const rowsHtml = list.map(b => (
+    '<tr>' +
+    '<td>' + escapeHtml(b.booking_ref) + '</td>' +
+    '<td>' + escapeHtml(b.customer_name) + '</td>' +
+    '<td>' + escapeHtml(b.customer_phone) + '</td>' +
+    '<td>' + escapeHtml(b.option_name) + '</td>' +
+    '<td>' + (b.booking_date ? new Date(b.booking_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '') + '</td>' +
+    '<td>' + formatTimeLabel(b.start_time) + ' - ' + formatTimeLabel(b.end_time) + '</td>' +
+    '<td>' + formatCurrency(b.amount) + '</td>' +
+    '<td>' + capitalize(b.payment_method || '') + '</td>' +
+    '<td>' + capitalize(b.status) + '</td>' +
+    '</tr>'
+  )).join('');
+  const html = '<!DOCTYPE html><html><head><title>PlayBox Kashmir - Bookings Export</title>' +
+    '<style>body{font-family:Arial,sans-serif;padding:20px;} h1{font-size:18px;margin-bottom:0;} p{color:#6b7280;margin-top:4px;} table{width:100%;border-collapse:collapse;margin-top:16px;} th,td{border:1px solid #e5e7eb;padding:6px 8px;font-size:12px;text-align:left;} th{background:#f3f4f6;}</style>' +
+    '</head><body>' +
+    '<h1>PlayBox Kashmir - Bookings Export</h1>' +
+    '<p>Range: ' + (from || 'All') + ' to ' + (to || 'All') + ' | Generated: ' + new Date().toLocaleString('en-IN') + '</p>' +
+    '<table><thead><tr><th>Booking Ref</th><th>Customer</th><th>Phone</th><th>Facility</th><th>Date</th><th>Time</th><th>Amount</th><th>Payment</th><th>Status</th></tr></thead>' +
+    '<tbody>' + rowsHtml + '</tbody></table>' +
+    '</body></html>';
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => { w.focus(); w.print(); }, 400);
 }
 </script>
 </body>
