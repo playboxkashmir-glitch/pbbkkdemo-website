@@ -71,12 +71,64 @@ async function loadDashboardSummary() {
     setText('stat-revenue', formatCurrency(data.today ? data.today.revenue : 0));
     setText('stat-week', data.week ? data.week.count : 0);
     setText('stat-month', formatCurrency(data.month ? data.month.revenue : 0));
-        renderRevenueChart(data.last7Days);
-        renderDashboardSportBreakdown(data.bySport);
-        renderPeakHours(data.peakHours);
+    renderStatChange('stat-today-change', data.today ? data.today.count : 0, data.yesterday ? data.yesterday.count : 0, { suffix: 'from yesterday', mode: 'diff' });
+    renderStatChange('stat-revenue-change', data.today ? data.today.revenue : 0, data.yesterday ? data.yesterday.revenue : 0, { suffix: 'from yesterday', mode: 'diff', currency: true });
+    renderStatChange('stat-week-change', data.week ? data.week.count : 0, data.lastWeekSame ? data.lastWeekSame.count : 0, { suffix: 'vs last week', mode: 'pct' });
+    renderStatChange('stat-month-change', data.month ? data.month.revenue : 0, data.lastMonthSame ? data.lastMonthSame.revenue : 0, { suffix: 'vs last month', mode: 'pct' });
+    renderRevenueChart(data.last7Days);
+    renderDashboardSportBreakdown(data.bySport);
+    renderPeakHours(data.peakHours);
   } catch (err) {
     console.error('Failed to load dashboard summary', err);
   }
+}
+
+function renderStatChange(elId, current, previous, opts) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+  opts = opts || {};
+  var suffix = opts.suffix || '';
+  var mode = opts.mode || 'diff';
+  var currency = !!opts.currency;
+  current = Number(current) || 0;
+  previous = Number(previous) || 0;
+  var text, cls;
+  function fmt(n) {
+    n = Math.round(n);
+    return currency ? ('₹' + Math.abs(n).toLocaleString('en-IN')) : String(Math.abs(n));
+  }
+  if (mode === 'diff') {
+    var diff = current - previous;
+    if (diff === 0) {
+      text = 'No change ' + suffix;
+      cls = 'neutral';
+    } else {
+      text = (diff > 0 ? '+' : '-') + fmt(diff) + ' ' + suffix;
+      cls = diff > 0 ? 'positive' : 'negative';
+    }
+  } else {
+    if (previous === 0) {
+      if (current === 0) {
+        text = 'No change ' + suffix;
+        cls = 'neutral';
+      } else {
+        text = 'New activity ' + suffix;
+        cls = 'positive';
+      }
+    } else {
+      var pct = Math.round(((current - previous) / previous) * 100);
+      if (pct === 0) {
+        text = 'No change ' + suffix;
+        cls = 'neutral';
+      } else {
+        text = (pct > 0 ? '+' : '') + pct + '% ' + suffix;
+        cls = pct > 0 ? 'positive' : 'negative';
+      }
+    }
+  }
+  el.textContent = text;
+  el.classList.remove('positive', 'negative', 'neutral');
+  el.classList.add(cls);
 }
 
 function setText(id, value) {
@@ -406,3 +458,91 @@ function formatTimeLabel(time24) {
   if (h === 0) h = 12;
   return h + ':' + (parts[1] || '00') + ' ' + period;
 }
+
+// --- Reliable inline-SVG icon rendering (Font Awesome CDN can be unavailable; this avoids that dependency) ---
+(function () {
+  var ICON_PATHS = {
+    'eye': '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="currentColor"/>',
+    'tachometer-alt': '<path d="M4 18a8 8 0 1 1 16 0" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="12" y1="18" x2="16" y2="12" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="18" r="1.4" fill="currentColor"/>',
+    'calendar-check': '<rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" stroke-width="1.6"/><line x1="7" y1="3" x2="7" y2="7" stroke="currentColor" stroke-width="1.6"/><line x1="17" y1="3" x2="17" y2="7" stroke="currentColor" stroke-width="1.6"/><path d="M8 14l2.5 2.5L16 11" fill="none" stroke="currentColor" stroke-width="1.8"/>',
+    'ban': '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="5.5" y1="18.5" x2="18.5" y2="5.5" stroke="currentColor" stroke-width="1.8"/>',
+    'calendar-alt': '<rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" stroke-width="1.6"/><line x1="7" y1="3" x2="7" y2="7" stroke="currentColor" stroke-width="1.6"/><line x1="17" y1="3" x2="17" y2="7" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="13" r="1" fill="currentColor"/><circle cx="12" cy="13" r="1" fill="currentColor"/><circle cx="16" cy="13" r="1" fill="currentColor"/><circle cx="8" cy="17" r="1" fill="currentColor"/><circle cx="12" cy="17" r="1" fill="currentColor"/>',
+    'users': '<circle cx="8.5" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2.5 20c0-3.3 2.7-6 6-6s6 2.7 6 6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="16.5" cy="9" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M14.7 14.2c.6-.2 1.2-.3 1.8-.3 2.9 0 5.3 2.1 5.5 5" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+    'building': '<rect x="4" y="3" width="16" height="18" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="7" y="6" width="3" height="3" fill="currentColor"/><rect x="14" y="6" width="3" height="3" fill="currentColor"/><rect x="7" y="11" width="3" height="3" fill="currentColor"/><rect x="14" y="11" width="3" height="3" fill="currentColor"/><rect x="9.5" y="16" width="5" height="5" fill="currentColor"/>',
+    'tags': '<path d="M3 11.5V4a1 1 0 0 1 1-1h7.5a1 1 0 0 1 .7.3l8 8a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-8-8a1 1 0 0 1-.3-.7z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="7.5" cy="7.5" r="1.3" fill="currentColor"/>',
+    'percentage': '<circle cx="7" cy="7" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="17" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="1.6"/>',
+    'chart-bar': '<line x1="3" y1="21" x2="21" y2="21" stroke="currentColor" stroke-width="1.6"/><rect x="5" y="13" width="3.5" height="8" fill="currentColor"/><rect x="10.5" y="9" width="3.5" height="12" fill="currentColor"/><rect x="16" y="5" width="3.5" height="16" fill="currentColor"/>',
+    'cog': '<circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="2.2 2.2"/>',
+    'external-link-alt': '<path d="M14 4h6v6" fill="none" stroke="currentColor" stroke-width="1.7"/><line x1="20" y1="4" x2="11" y2="13" stroke="currentColor" stroke-width="1.7"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="1.7"/>',
+    'sign-out-alt': '<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3" fill="none" stroke="currentColor" stroke-width="1.7"/><line x1="21" y1="12" x2="10" y2="12" stroke="currentColor" stroke-width="1.7"/><path d="M17 8l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.7"/>',
+    'bars': '<line x1="3" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="1.8"/><line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="1.8"/><line x1="3" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="1.8"/>',
+    'plus': '<line x1="12" y1="4" x2="12" y2="20" stroke="currentColor" stroke-width="2"/><line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="2"/>',
+    'calendar-week': '<rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="13" width="16" height="4" fill="currentColor" opacity="0.35"/>',
+    'chart-line': '<polyline points="3,17 9,10 13,14 21,5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="10" r="1.2" fill="currentColor"/><circle cx="13" cy="14" r="1.2" fill="currentColor"/><circle cx="21" cy="5" r="1.2" fill="currentColor"/>',
+    'edit': '<path d="M4 20l1-4.5L15.5 5l3.5 3.5L8.5 19 4 20z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><line x1="13.5" y1="7" x2="17" y2="10.5" stroke="currentColor" stroke-width="1.5"/>',
+    'times': '<line x1="5" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/><line x1="19" y1="5" x2="5" y2="19" stroke="currentColor" stroke-width="2"/>',
+    'undo': '<path d="M4 10h8a6 6 0 1 1-5.6 8" fill="none" stroke="currentColor" stroke-width="1.8"/><polyline points="4,4 4,10 10,10" fill="none" stroke="currentColor" stroke-width="1.8"/>',
+    'check': '<polyline points="4,12 9,17 20,5" fill="none" stroke="currentColor" stroke-width="2"/>',
+    'trash': '<line x1="4" y1="7" x2="20" y2="7" stroke="currentColor" stroke-width="1.7"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" fill="none" stroke="currentColor" stroke-width="1.7"/><line x1="9" y1="4" x2="15" y2="4" stroke="currentColor" stroke-width="1.7"/>',
+    'chevron-left': '<polyline points="15,4 7,12 15,20" fill="none" stroke="currentColor" stroke-width="2"/>',
+    'chevron-right': '<polyline points="9,4 17,12 9,20" fill="none" stroke="currentColor" stroke-width="2"/>',
+    'search': '<circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="20" y1="20" x2="15.2" y2="15.2" stroke="currentColor" stroke-width="1.8"/>',
+    'save': '<path d="M5 3h11l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="8" y="3" width="8" height="5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="7" y="13" width="10" height="7" fill="none" stroke="currentColor" stroke-width="1.4"/>'
+  };
+
+  function iconNameFromClassList(classList) {
+    for (var i = 0; i < classList.length; i++) {
+      var c = classList[i];
+      if (c.indexOf('fa-') === 0) return c.slice(3);
+    }
+    return null;
+  }
+
+  function convertIcon(el) {
+    if (!el || el.getAttribute('data-pk-converted')) return;
+    var name = iconNameFromClassList(el.classList);
+    if (!name) return;
+    if (name === 'rupee-sign') {
+      var span = document.createElement('span');
+      span.className = el.className;
+      span.textContent = '₹';
+      span.style.fontWeight = '700';
+      if (el.parentNode) el.parentNode.replaceChild(span, el);
+      return;
+    }
+    var svgInner = ICON_PATHS[name];
+    if (!svgInner) return;
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', '1em');
+    svg.setAttribute('height', '1em');
+    svg.setAttribute('class', el.className);
+    svg.setAttribute('aria-hidden', 'true');
+    svg.style.display = 'inline-block';
+    svg.style.verticalAlign = '-0.125em';
+    svg.innerHTML = svgInner;
+    if (el.parentNode) el.parentNode.replaceChild(svg, el);
+  }
+
+  function convertAll(root) {
+    if (!root || !root.querySelectorAll) return;
+    var els = root.querySelectorAll('i.fas, i.far, i.fab');
+    for (var i = 0; i < els.length; i++) convertIcon(els[i]);
+  }
+
+  convertAll(document);
+  document.addEventListener('DOMContentLoaded', function () { convertAll(document); });
+
+  var observer = new MutationObserver(function (mutations) {
+    for (var i = 0; i < mutations.length; i++) {
+      var added = mutations[i].addedNodes;
+      for (var j = 0; j < added.length; j++) {
+        var node = added[j];
+        if (node.nodeType !== 1) continue;
+        if (node.matches && node.matches('i.fas, i.far, i.fab')) convertIcon(node);
+        convertAll(node);
+      }
+    }
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+})();
