@@ -43,6 +43,20 @@ export default async function handler(req, res) {
                      WHERE booking_date >= date_trunc('month', CURRENT_DATE) AND status IN ('confirmed','completed')`
             );
 
+      const lastWeekSame = await query(
+        `SELECT COUNT(*) AS count FROM bookings
+               WHERE booking_date >= date_trunc('week', CURRENT_DATE) - INTERVAL '7 days'
+                 AND booking_date <= CURRENT_DATE - INTERVAL '7 days'
+                 AND status IN ('confirmed','completed')`
+      );
+
+      const lastMonthSame = await query(
+        `SELECT COALESCE(SUM(amount),0) AS revenue FROM bookings
+               WHERE booking_date >= date_trunc('month', CURRENT_DATE - INTERVAL '1 month')
+                 AND booking_date <= CURRENT_DATE - INTERVAL '1 month'
+                 AND status IN ('confirmed','completed')`
+      );
+
       const bySport = await query(
               `SELECT f.sport_name, COUNT(*) AS count
                      FROM bookings b JOIN facilities f ON f.id = b.facility_id
@@ -100,13 +114,15 @@ export default async function handler(req, res) {
         }));
 
       return res.status(200).json({
-              today: today.rows[0],
-              yesterday: yesterday.rows[0],
-              week: week.rows[0],
-              month: month.rows[0],
-              bySport: bySport.rows,
-              last7Days,
-              peakHours
+        today: today.rows[0],
+        yesterday: yesterday.rows[0],
+        week: week.rows[0],
+        month: month.rows[0],
+        lastWeekSame: lastWeekSame.rows[0],
+        lastMonthSame: lastMonthSame.rows[0],
+        bySport: bySport.rows,
+        last7Days,
+        peakHours
       });
   } catch (err) {
         console.error('Reports summary error:', err);

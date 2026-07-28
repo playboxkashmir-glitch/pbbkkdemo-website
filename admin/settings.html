@@ -94,6 +94,27 @@
 </div>
 </div>
 
+<div class="pk-settings-section">
+<h4>Pricing Rules</h4>
+<div class="form-grid">
+<div class="form-group">
+<label>Reserve/Advance Amount (Rs.)</label>
+<input type="number" id="setReserveAmount" min="0" step="1" placeholder="500">
+</div>
+<div class="form-group">
+<label>Inaugural Discount (%)</label>
+<input type="number" id="setInauguralDiscount" min="0" max="100" step="1" placeholder="15">
+</div>
+<div class="form-group">
+<label>GST Rate (%)</label>
+<input type="number" id="setGstRate" min="0" max="100" step="0.1" placeholder="0">
+</div>
+<div class="form-group form-full">
+<label>Peak Hours (24h, comma-separated, e.g. 18,19,20,21)</label>
+<input type="text" id="setPeakHours" placeholder="18,19,20,21">
+</div>
+</div>
+</div>
 <div class="pk-save-bar">
 <button class="btn-add-booking" id="saveSettingsBtn" onclick="saveSettings()"><i class="fas fa-save"></i> Save Settings</button>
 <span class="pk-save-msg" id="saveSettingsMsg">Settings saved successfully.</span>
@@ -110,54 +131,66 @@ loadSettings();
 });
 
 const SETTINGS_FIELDS = [
-{ key: 'business_name', id: 'setBusinessName' },
-{ key: 'business_phone', id: 'setBusinessPhone' },
-{ key: 'business_email', id: 'setBusinessEmail' },
-{ key: 'business_address', id: 'setBusinessAddress' },
-{ key: 'opening_hour', id: 'setOpeningHour' },
-{ key: 'closing_hour', id: 'setClosingHour' },
-{ key: 'slot_duration_minutes', id: 'setSlotDuration' }
+  { key: 'business_name', id: 'setBusinessName' },
+  { key: 'business_phone', id: 'setBusinessPhone' },
+  { key: 'business_email', id: 'setBusinessEmail' },
+  { key: 'business_address', id: 'setBusinessAddress' },
+  { key: 'opening_hour', id: 'setOpeningHour' },
+  { key: 'closing_hour', id: 'setClosingHour' },
+  { key: 'slot_duration_minutes', id: 'setSlotDuration' },
+  { key: 'reserve_amount', id: 'setReserveAmount' },
+  { key: 'inaugural_discount_pct', id: 'setInauguralDiscount' },
+  { key: 'gst_rate', id: 'setGstRate' },
+  {
+    key: 'peak_hours', id: 'setPeakHours',
+    parse: function (v) { return Array.isArray(v) ? v.join(', ') : (v || ''); },
+    serialize: function (v) {
+      return String(v).split(',').map(function (s) { return parseInt(s.trim(), 10); }).filter(function (n) { return !isNaN(n); });
+    }
+  }
 ];
 
 async function loadSettings() {
-try {
-const res = await fetch('/api/settings', { credentials: 'include' });
-if (!res.ok) return;
-const data = await res.json();
-const settings = data.settings || {};
-SETTINGS_FIELDS.forEach(f => {
-if (settings[f.key] !== undefined && settings[f.key] !== null) {
-document.getElementById(f.id).value = settings[f.key];
-}
-});
-} catch (err) {
-console.error('Failed to load settings', err);
-}
+  try {
+    const res = await fetch('/api/settings', { credentials: 'include' });
+    if (!res.ok) return;
+    const settings = await res.json();
+    SETTINGS_FIELDS.forEach(function (f) {
+      if (settings[f.key] !== undefined && settings[f.key] !== null) {
+        var val = settings[f.key];
+        if (f.parse) val = f.parse(val);
+        document.getElementById(f.id).value = val;
+      }
+    });
+  } catch (err) {
+    console.error('Failed to load settings', err);
+  }
 }
 
 async function saveSettings() {
-const btn = document.getElementById('saveSettingsBtn');
-const msg = document.getElementById('saveSettingsMsg');
-btn.disabled = true;
-msg.style.display = 'none';
+  const btn = document.getElementById('saveSettingsBtn');
+  const msg = document.getElementById('saveSettingsMsg');
+  btn.disabled = true;
+  msg.style.display = 'none';
 
-try {
-for (const f of SETTINGS_FIELDS) {
-const value = document.getElementById(f.id).value;
-await fetch('/api/settings', {
-method: 'PUT',
-headers: { 'Content-Type': 'application/json' },
-credentials: 'include',
-body: JSON.stringify({ key: f.key, value: value })
-});
-}
-msg.style.display = 'inline';
-setTimeout(() => { msg.style.display = 'none'; }, 3000);
-} catch (err) {
-alert('Some settings may not have saved due to a network error. Please try again.');
-} finally {
-btn.disabled = false;
-}
+  try {
+    for (const f of SETTINGS_FIELDS) {
+      let value = document.getElementById(f.id).value;
+      if (f.serialize) value = f.serialize(value);
+      await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ key: f.key, value: value })
+      });
+    }
+    msg.style.display = 'inline';
+    setTimeout(() => { msg.style.display = 'none'; }, 3000);
+  } catch (err) {
+    alert('Some settings may not have saved due to a network error. Please try again.');
+  } finally {
+    btn.disabled = false;
+  }
 }
 </script>
 </body>

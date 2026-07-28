@@ -124,7 +124,7 @@
           <div class="facility-footer">
             <div class="facility-price">
               <span class="price-from">From</span>
-              <span class="price-strike">₹2000</span> <span class="price-amount" data-live-price="turf1">₹1700</span> <span class="offer-badge">15% OFF</span>
+              <span class="price-strike" id="homePriceStrike">₹2000</span> <span class="price-amount" data-live-price="turf1">₹1700</span> <span class="offer-badge" id="homePriceBadge">15% OFF</span>
               <span class="price-unit">/hour</span>
             </div>
             <a href="book.html?sport=football" class="btn-book-small">Book Now</a>
@@ -368,5 +368,36 @@
 
 
 <script src="assets/js/main.js"></script>
+<script>
+(async function () {
+  try {
+    var priceEl = document.querySelector('[data-live-price="turf1"]');
+    var strikeEl = document.getElementById('homePriceStrike');
+    var badgeEl = document.getElementById('homePriceBadge');
+    if (!priceEl) return;
+    var facRes = await fetch('/api/facilities');
+    if (!facRes.ok) return;
+    var facData = await facRes.json();
+    var facility = (facData.facilities || []).find(function (f) { return f.option_id === 'turf1'; });
+    if (!facility) return;
+    var basePrice = parseFloat(facility.base_price) || 0;
+    var pct = 15;
+    try {
+      var setRes = await fetch('/api/settings');
+      if (setRes.ok) {
+        var settings = await setRes.json();
+        var parsedPct = parseFloat(settings.inaugural_discount_pct);
+        if (!isNaN(parsedPct)) pct = parsedPct;
+      }
+    } catch (e) {}
+    var discounted = Math.round(basePrice * (1 - pct / 100));
+    if (strikeEl) strikeEl.textContent = '₹' + basePrice.toLocaleString('en-IN');
+    priceEl.textContent = '₹' + discounted.toLocaleString('en-IN');
+    if (badgeEl) badgeEl.textContent = pct + '% OFF';
+  } catch (err) {
+    console.error('Could not load live pricing', err);
+  }
+})();
+</script>
 </body>
 </html>
