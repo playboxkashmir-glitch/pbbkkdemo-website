@@ -29,7 +29,7 @@ try {
   }
 
   if (req.method === 'POST') {
-    if (resource === 'register') return handleRegister(req, res);
+    if (resource === 'register-team') return handleRegister(req, res);
     if (resource === 'create-order') return handleCreateOrder(req, res);
     if (resource === 'record-result') return handleRecordResult(req, res);
     return handleCreate(req, res);
