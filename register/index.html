@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Register - PlayBox Kashmir™</title>
+<link rel="icon" type="image/png" href="../favicon.png">
+<meta name="description" content="Register for tournaments and memberships at PlayBox Kashmir™.">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+<style>
+body.register-page{background:#f9fafb;min-height:100vh;}
+.register-hero{text-align:center;padding:5rem 1.5rem 2rem;}
+.register-hero h1{font-size:2.2rem;margin-bottom:0.5rem;color:#111827;}
+.register-hero p{color:#6b7280;font-size:1.05rem;}
+.register-container{max-width:900px;margin:0 auto;padding:2rem 1.5rem 4rem;}
+.register-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.5rem;}
+.register-card{display:flex;flex-direction:column;align-items:center;text-align:center;background:#fff;border-radius:16px;padding:2.5rem 1.5rem;box-shadow:0 2px 12px rgba(0,0,0,0.06);text-decoration:none;color:inherit;transition:transform .2s,box-shadow .2s;border:1px solid #eee;}
+.register-card:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,0.1);}
+.register-card.disabled-card{opacity:0.65;cursor:not-allowed;}
+.register-card.disabled-card:hover{transform:none;box-shadow:0 2px 12px rgba(0,0,0,0.06);}
+.register-card-icon{font-size:2.5rem;color:#15803d;margin-bottom:1rem;}
+.register-card h3{font-size:1.3rem;margin-bottom:0.5rem;color:#111827;}
+.register-card p{color:#6b7280;font-size:0.95rem;margin-bottom:1rem;}
+.coming-soon-badge{background:#f3f4f6;color:#6b7280;font-size:0.8rem;font-weight:700;padding:6px 14px;border-radius:20px;}
+.register-card-cta{color:#15803d;font-weight:700;font-size:0.95rem;}
+.register-footer{text-align:center;padding:2rem;color:#9ca3af;font-size:0.85rem;}
+</style>
+</head>
+<body class="register-page">
+
+<nav class="navbar" id="navbar">
+<div class="nav-container">
+<a href="index.html" class="nav-logo">
+<span class="logo-play">Play</span><span class="logo-box">Box</span>
+<span class="logo-kashmir">Kashmir</span><span class="logo-tm">™</span>
+</a>
+<div class="nav-actions">
+<a href="https://playboxkashmir.com" class="btn-back-home">
+<i class="fas fa-arrow-left"></i> Main Website
+</a>
+</div>
+</div>
+</nav>
+
+<div class="register-hero">
+<h1>Welcome to PlayBox Registrations</h1>
+<p>Choose an option below to get started</p>
+</div>
+
+<div class="register-container">
+<div class="register-cards">
+
+<div class="register-card disabled-card">
+<div class="register-card-icon"><i class="fas fa-id-card"></i></div>
+<h3>Membership</h3>
+<p>Sign up for a PlayBox membership plan.</p>
+<span class="coming-soon-badge">Coming Soon</span>
+</div>
+
+<a href="tournament.html" class="register-card">
+<div class="register-card-icon"><i class="fas fa-trophy"></i></div>
+<h3>Tournaments</h3>
+<p>Register your team for an upcoming tournament.</p>
+<span class="register-card-cta">Get Started <i class="fas fa-arrow-right"></i></span>
+</a>
+
+</div>
+</div>
+
+<footer class="register-footer">
+<p>&copy; 2026 PlayBox Kashmir™. All rights reserved.</p>
+</footer>
+
+</body>
+</html>

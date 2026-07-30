@@ -79,3 +79,84 @@ INSERT INTO facilities (sport_key, sport_name, option_id, option_name, base_pric
 ('pickleball', 'Pickleball Court', 'pb_a', 'Court A', 300, 400),
 ('pickleball', 'Pickleball Court', 'pb_b', 'Court B', 300, 400)
 ON CONFLICT (option_id) DO NOTHING;
+
+
+
+-- ============================================================
+-- Tournaments module
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS tournaments (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('open','invite')),
+  format TEXT NOT NULL CHECK (format IN ('5-a-side','6-a-side','7-a-side')),
+  num_teams INTEGER NOT NULL CHECK (num_teams IN (4,8,16,32)),
+  substitutes_allowed INTEGER NOT NULL DEFAULT 3,
+  start_date DATE NOT NULL,
+  registration_deadline DATE,
+  entry_fee NUMERIC(10,2) NOT NULL DEFAULT 0,
+  duration_notes TEXT,
+  rules TEXT,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','open','full','seeded','in_progress','completed','cancelled')),
+  seeded_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+-- For invite-only tournaments: one row per team slot. Emails can be left
+-- blank when creating the tournament and filled in / edited later from
+-- the admin panel. Only these emails may register for the tournament.
+CREATE TABLE IF NOT EXISTS tournament_invite_emails (
+  id SERIAL PRIMARY KEY,
+  tournament_id INTEGER NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  slot_index INTEGER NOT NULL,
+  email TEXT,
+  used BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_invite_slot ON tournament_invite_emails (tournament_id, slot_index);
+
+CREATE TABLE IF NOT EXISTS tournament_teams (
+  id SERIAL PRIMARY KEY,
+  tournament_id INTEGER NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  team_name TEXT NOT NULL,
+  captain_name TEXT NOT NULL,
+  contact_number TEXT NOT NULL,
+  email TEXT NOT NULL,
+  seed_label TEXT,
+  payment_status TEXT NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending','paid','failed')),
+  amount_paid NUMERIC(10,2),
+  razorpay_order_id TEXT,
+  razorpay_payment_id TEXT,
+  terms_accepted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_team_email_per_tournament ON tournament_teams (tournament_id, email);
+CREATE INDEX IF NOT EXISTS idx_tournament_teams_tournament ON tournament_teams (tournament_id);
+
+CREATE TABLE IF NOT EXISTS tournament_players (
+  id SERIAL PRIMARY KEY,
+  team_id INTEGER NOT NULL REFERENCES tournament_teams(id) ON DELETE CASCADE,
+  player_name TEXT NOT NULL,
+  jersey_number TEXT,
+  is_substitute BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+CREATE TABLE IF NOT EXISTS tournament_matches (
+  id SERIAL PRIMARY KEY,
+  tournament_id INTEGER NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  round INTEGER NOT NULL,
+  round_name TEXT NOT NULL,
+  match_index INTEGER NOT NULL,
+  team1_id INTEGER REFERENCES tournament_teams(id),
+  team2_id INTEGER REFERENCES tournament_teams(id),
+  match_date DATE,
+  winner_id INTEGER REFERENCES tournament_teams(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+CREATE INDEX IF NOT EXISTS idx_tournament_matches_tournament ON tournament_matches (tournament_id);

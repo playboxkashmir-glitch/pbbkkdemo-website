@@ -3,6 +3,8 @@
 // then acknowledges events like payment.captured, payment.failed, order.paid.
 // IMPORTANT: Signature verification requires the EXACT raw request body bytes,
 // so automatic JSON body-parsing is disabled below and we read the raw stream.
+import { sendTournamentConfirmationEmail } from '../lib/email.js';
+import { seedTournamentIfFull } from '../lib/tournament.js';
 import crypto from 'crypto';
 import { query } from '../lib/db.js';
 import { sendBookingConfirmationEmail } from '../lib/email.js';
@@ -85,6 +87,9 @@ async function handlePaymentCaptured(event) {
       return;
     }
     const notes = payment.notes || {};
+    if (notes.type === 'tournament') {
+      return handleTournamentPaymentCaptured(payment);
+    }
     const bookingRef = notes.booking_id;
     if (!bookingRef) {
       console.error('payment.captured event missing booking_id in notes.');
@@ -149,5 +154,49 @@ async function handlePaymentCaptured(event) {
     await query('UPDATE bookings SET confirmation_sent_at = now() WHERE id = $1', [booking.id]);
   } catch (err) {
     console.error('handlePaymentCaptured error:', err);
+  }
+}
+
+
+// Handles a captured payment for a TOURNAMENT entry fee (as opposed to a
+// slot booking, handled by handlePaymentCaptured above). Marks the team
+// as paid, sends the tournament-specific confirmation email (separate
+// from the slot-booking confirmation email), and checks whether the
+// tournament has now filled up so it can be randomly seeded.
+async function handleTournamentPaymentCaptured(payment) {
+  try {
+    const notes = payment.notes || {};
+    const teamId = notes.team_id;
+    if (!teamId) {
+      console.error('Tournament payment.captured event missing team_id in notes.');
+      return;
+    }
+
+  const teamRes = await query('SELECT * FROM tournament_teams WHERE id = $1', [teamId]);
+    const team = teamRes.rows[0];
+    if (!team) {
+      console.error('No tournament team found for id', teamId);
+      return;
+    }
+    if (team.payment_status === 'paid') {
+      console.log('Tournament team already recorded as paid:', teamId);
+      return;
+    }
+
+  const amountPaid = payment.amount ? payment.amount / 100 : Number(notes.amount) || 0;
+
+  const updateRes = await query(
+    "UPDATE tournament_teams SET payment_status = 'paid', amount_paid = $1, razorpay_payment_id = $2 WHERE id = $3 RETURNING *",
+    [amountPaid, payment.id, teamId]
+    );
+    const updatedTeam = updateRes.rows[0];
+
+  const tRes = await query('SELECT * FROM tournaments WHERE id = $1', [team.tournament_id]);
+    const tournament = tRes.rows[0];
+
+  await sendTournamentConfirmationEmail(updatedTeam, tournament);
+    await seedTournamentIfFull(team.tournament_id);
+  } catch (err) {
+    console.error('handleTournamentPaymentCaptured error:', err);
   }
 }

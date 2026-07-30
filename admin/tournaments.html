@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tournament – PlayBox Kashmir Admin</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="admin.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+.pk-empty,.pk-loading{text-align:center;color:#9ca3af;padding:2rem;}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1.5rem;}
+.detail-field{display:flex;flex-direction:column;font-size:0.85rem;}
+.detail-label{color:#9ca3af;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;}
+.detail-value{font-weight:600;color:#111827;}
+.quick-settings-form{display:flex;align-items:flex-end;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem;}
+.quick-settings-form label{display:flex;flex-direction:column;font-size:0.85rem;gap:0.35rem;}
+.detail-table{width:100%;border-collapse:collapse;margin-bottom:1.5rem;}
+.detail-table th,.detail-table td{padding:0.5rem;border-bottom:1px solid #e5e7eb;text-align:left;font-size:0.85rem;}
+.match-row{display:flex;align-items:center;gap:1rem;padding:0.5rem 0;border-bottom:1px solid #f3f4f6;font-size:0.85rem;}
+.invite-email-input,.invite-email-detail-input{display:block;width:100%;margin-bottom:0.5rem;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;}
+#inviteEmailInputs,#inviteEmailsDetailWrap{margin-bottom:1rem;}
+.tournament-detail-modal{max-width:800px;}
+</style>
+</head>
+<body class="admin-body">
+
+<aside class="admin-sidebar" id="adminSidebar">
+<div class="sidebar-brand">
+<span class="logo-play">Play</span><span class="logo-box">Box</span>
+<span style="color:#f59e0b;font-size:0.75rem;font-weight:700;margin-left:4px;">ADMIN</span>
+</div>
+<nav class="sidebar-nav">
+<a href="dashboard.html" class="sidebar-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+<a href="bookings.html" class="sidebar-link"><i class="fas fa-calendar-check"></i> Bookings</a>
+<a href="cancel-bookings.html" class="sidebar-link"><i class="fas fa-ban"></i> Cancel Booking</a>
+<a href="calendar.html" class="sidebar-link"><i class="fas fa-calendar-alt"></i> Calendar View</a>
+<a href="customers.html" class="sidebar-link"><i class="fas fa-users"></i> Customers</a>
+<a href="facilities.html" class="sidebar-link"><i class="fas fa-building"></i> Facilities</a>
+<a href="pricing.html" class="sidebar-link"><i class="fas fa-tags"></i> Pricing</a>
+<a href="promos.html" class="sidebar-link"><i class="fas fa-percentage"></i> Promo Codes</a>
+<a href="reports.html" class="sidebar-link"><i class="fas fa-chart-bar"></i> Reports</a>
+<a href="settings.html" class="sidebar-link"><i class="fas fa-cog"></i> Settings</a>
+<a href="tournaments.html" class="sidebar-link active"><i class="fas fa-trophy"></i> Tournament</a>
+<a href="memberships.html" class="sidebar-link"><i class="fas fa-id-card"></i> Memberships</a>
+<div class="sidebar-divider"></div>
+<a href="../index.html" class="sidebar-link" target="_blank"><i class="fas fa-external-link-alt"></i> View Website</a>
+<a href="login.html" class="sidebar-link logout" onclick="handleLogout(event)"><i class="fas fa-sign-out-alt"></i> Logout</a>
+</nav>
+</aside>
+
+<main class="admin-main">
+<header class="admin-header">
+<button class="sidebar-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+<div class="header-title">
+<h1>Tournament</h1>
+<p>Create and manage tournaments, brackets, and registrations</p>
+</div>
+<div class="header-actions">
+<div class="header-date" id="headerDate"></div>
+<button class="btn-add-booking" id="createTournamentBtn"><i class="fas fa-plus"></i> Create Tournament</button>
+</div>
+</header>
+
+<div style="padding:2rem;">
+<div class="admin-card">
+<div class="bookings-table-wrap">
+<table class="bookings-table">
+<thead>
+<tr>
+<th>Name</th>
+<th>Category</th>
+<th>Format</th>
+<th>Teams</th>
+<th>Status</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="tournamentsTableBody">
+<tr><td colspan="6" class="pk-loading">Loading tournaments...</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+
+<div class="modal-overlay" id="tournamentModal" style="display:none;">
+<div class="admin-modal">
+<div class="modal-header">
+<h3 id="tournamentModalTitle">Create Tournament</h3>
+<button class="modal-close-btn" id="closeTournamentModalBtn"><i class="fas fa-times"></i></button>
+</div>
+<div class="modal-body">
+<input type="hidden" id="t_id">
+<div class="form-grid">
+<div class="form-group">
+<label>Tournament Name</label>
+<input type="text" id="t_name" placeholder="e.g. Summer 5-a-side Cup">
+</div>
+<div class="form-group">
+<label>Category</label>
+<select id="t_category">
+<option value="open">Open For All</option>
+<option value="invite_only">Invite Only</option>
+</select>
+</div>
+<div class="form-group">
+<label>Format</label>
+<select id="t_format">
+<option value="5-a-side">5-a-side</option>
+<option value="6-a-side">6-a-side</option>
+<option value="7-a-side">7-a-side</option>
+</select>
+</div>
+<div class="form-group">
+<label>Number of Teams</label>
+<select id="t_num_teams">
+<option value="4">4</option>
+<option value="8">8</option>
+<option value="16">16</option>
+<option value="32">32</option>
+</select>
+</div>
+<div class="form-group">
+<label>Substitutes per Team</label>
+<input type="number" id="t_substitutes" min="0" value="3">
+</div>
+<div class="form-group">
+<label>Entry Fee (Rs.)</label>
+<input type="number" id="t_entry_fee" min="0" placeholder="0">
+</div>
+<div class="form-group">
+<label>Start Date</label>
+<input type="date" id="t_start_date">
+</div>
+<div class="form-group">
+<label>Registration Deadline</label>
+<input type="date" id="t_registration_deadline">
+</div>
+<div class="form-group">
+<label>Duration Notes</label>
+<input type="text" id="t_duration_notes" placeholder="e.g. 3 weekends">
+</div>
+</div>
+<div class="form-group" style="padding:0 1.5rem;">
+<label>Rules / Notes</label>
+<textarea id="t_rules" rows="3" placeholder="Optional rules or notes shown to registering teams"></textarea>
+</div>
+<div id="inviteEmailsWrap" style="display:none;padding:0 1.5rem;">
+<label>Invite Emails (one per team slot, optional, editable later)</label>
+<div id="inviteEmailInputs"></div>
+</div>
+</div>
+<div class="modal-footer">
+<button class="btn-cancel" onclick="closeTournamentModal()">Cancel</button>
+<button class="btn-confirm" id="saveTournamentBtn">Save Tournament</button>
+</div>
+</div>
+</div>
+
+<div class="modal-overlay" id="detailModal" style="display:none;">
+<div class="admin-modal tournament-detail-modal">
+<div class="modal-header">
+<h3>Tournament Details</h3>
+<button class="modal-close-btn" id="closeDetailModalBtn"><i class="fas fa-times"></i></button>
+</div>
+<div class="modal-body" id="detailModalBody">
+Loading...
+</div>
+</div>
+</div>
+
+<script src="admin.js"></script>
+<script src="tournaments.js"></script>
+</body>
+</html>
