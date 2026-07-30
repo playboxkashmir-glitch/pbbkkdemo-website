@@ -40,14 +40,21 @@ function renderTournamentCard(t) {
           '<span class="tourn-card-badge ' + t.category + '">' + badgeLabel + '</span>' +
           '<h3>' + escapeHtmlLocal(t.name) + '</h3>' +
           '<p>' + escapeHtmlLocal(capitalizeWordLocal(t.format)) + '</p>' +
-          '<p>Starts ' + (t.start_date || 'TBA') + '</p>' +
-          '<div class="tourn-fee">Entry Fee: ₹' + (t.entry_fee || 0) + '</div>' +
+                '<p>Starts ' + formatDateOnlyLocal(t.start_date) + '</p>' +
+                '<div class="tourn-fee">Entry Fee: ₹' + (t.entry_fee || 0) + '</div>' +
           '</div>';
 }
 
 function escapeHtmlLocal(str) {
     if (str === null || str === undefined) return '';
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function formatDateOnlyLocal(str) {
+        if (!str) return 'TBA';
+        const d = new Date(str);
+        if (isNaN(d.getTime())) return 'TBA';
+        return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function capitalizeWordLocal(str) {
@@ -180,7 +187,7 @@ async function submitRegistration() {
       const orderRes = await fetch('/api/tournaments?resource=create-order', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ team_id: currentTeamId })
+              body: JSON.stringify({ team_id: currentTeamId, terms_accepted: agreeTerms })
       });
         const orderData = await orderRes.json();
         hideLoading();
