@@ -53,7 +53,7 @@ async function loadTournaments() {
 function renderTournamentRow(t) {
     const catLabel = capitalizeWord(t.category);
     const formatLabel = capitalizeWord(t.format);
-    const count = (t.registered_count || 0) + ' / ' + t.num_teams;
+    const count = (t.teams_registered || 0) + ' / ' + t.num_teams;
     return '<tr>' +
           '<td>' + escapeHtml(t.name) + '</td>' +
           '<td>' + catLabel + '</td>' +
@@ -166,7 +166,7 @@ async function openDetailModal(id) {
           const res = await fetch('/api/tournaments?resource=admin-detail&id=' + encodeURIComponent(id), { credentials: 'include' });
           if (!res.ok) throw new Error('load failed');
           const data = await res.json();
-          renderDetail(data.tournament);
+          renderDetail(data);
     } catch (err) {
           body.innerHTML = 'Error loading tournament detail.';
     }
@@ -182,14 +182,18 @@ function settingsField(label, value) {
     return '<div class="detail-field"><span class="detail-label">' + escapeHtml(label) + '</span><span class="detail-value">' + escapeHtml(String(value)) + '</span></div>';
 }
 
-function renderDetail(t) {
+function renderDetail(data) {
+    const t = data.tournament;
+    const teams = data.teams || [];
+    const inviteEmails = data.invite_emails || [];
+    const matches = data.matches || [];
     const body = document.getElementById('detailModalBody');
     if (!body) return;
     let html = '<h3>' + escapeHtml(t.name) + '</h3>';
     html += '<div class="detail-grid">';
     html += settingsField('Category', capitalizeWord(t.category));
     html += settingsField('Format', capitalizeWord(t.format));
-    html += settingsField('Teams', (t.registered_count || 0) + ' / ' + t.num_teams);
+    html += settingsField('Teams', (teams.filter(function (tm) { return tm.payment_status === 'paid'; }).length + ' / ' + t.num_teams);
     html += settingsField('Status', capitalizeWord(t.status));
     html += settingsField('Start Date', t.start_date || '-');
     html += settingsField('Registration Deadline', t.registration_deadline || '-');
@@ -211,7 +215,7 @@ function renderDetail(t) {
   if (t.category === 'invite_only') {
         html += '<h4>Invite Emails</h4>';
         html += '<div id="inviteEmailsDetailWrap">';
-        (t.invite_emails || []).forEach(function (e, i) {
+        inviteEmails.forEach(function (e, i) {
                 html += '<input type="email" class="invite-email-detail-input" data-slot="' + i + '" value="' + escapeHtml(e || '') + '" placeholder="Team ' + (i + 1) + ' email" />';
         });
         html += '</div>';
@@ -219,7 +223,6 @@ function renderDetail(t) {
   }
 
   html += '<h4>Registered Teams</h4>';
-    const teams = t.teams || [];
     if (!teams.length) {
           html += '<p>No teams registered yet.</p>';
     } else {
@@ -230,13 +233,12 @@ function renderDetail(t) {
                             '<td>' + escapeHtml(team.captain_name) + '</td>' +
                             '<td>' + escapeHtml(team.email) + '</td>' +
                             '<td>' + escapeHtml(team.seed_label || '-') + '</td>' +
-                            '<td>' + (team.paid ? 'Yes' : 'No') + '</td>' +
+                            '<td>' + (team.payment_status === 'paid' ? 'Yes' : 'No') + '</td>' +
                             '</tr>';
           });
           html += '</tbody></table>';
     }
 
-  const matches = t.matches || [];
     if (matches.length) {
           html += '<h4>Bracket</h4>';
           const rounds = {};
