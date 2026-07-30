@@ -1,7 +1,7 @@
 {
       "routes": [
             { "src": "^/$", "has": [{ "type": "host", "value": "register.playboxkashmir.com" }], "dest": "/register/index.html", "continue": true },
-            { "src": "^/(?!api/)(.*)$", "has": [{ "type": "host", "value": "register.playboxkashmir.com" }], "dest": "/register/$1", "continue": true },
+            { "src": "^/(?!api/|register/)(.*)$", "has": [{ "type": "host", "value": "register.playboxkashmir.com" }], "dest": "/register/$1", "continue": true },
               { "src": "^/lib(?:/.*)?$", "status": 404 },
               { "src": "^/db(?:/.*)?$", "status": 404 },
               { "src": "^/scripts(?:/.*)?$", "status": 404 },
