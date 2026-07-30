@@ -6,10 +6,12 @@
 import { query } from '../../lib/db.js';
 import { requireAuth } from '../../lib/auth.js';
 import { seedTournamentIfFull, recordMatchResult } from '../../lib/tournament.js';
+import { sendTournamentCancellationEmail } from '../../lib/email.js';
 
 const CATEGORIES = ['open', 'invite'];
 const FORMATS = ['5-a-side', '6-a-side', '7-a-side'];
 const TEAM_SIZES = [4, 8, 16, 32];
+const STATUSES = ['draft', 'open', 'full', 'seeded', 'in_progress', 'completed', 'cancelled'];
 
 function parseBody(req) {
   return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
@@ -192,7 +194,25 @@ async function handleUpdate(req, res) {
   if (!id) return res.status(400).json({ error: 'id is required.' });
   const body = parseBody(req);
 
-const fields = ['name', 'format', 'num_teams', 'substitutes_allowed', 'start_date', 'registration_deadline', 'entry_fee', 'duration_notes', 'rules', 'status'];
+    if (body.category !== undefined && CATEGORIES.indexOf(body.category) === -1) {
+          return res.status(400).json({ error: 'category must be "open" or "invite".' });
+    }
+    if (body.format !== undefined && FORMATS.indexOf(body.format) === -1) {
+          return res.status(400).json({ error: 'format must be 5-a-side, 6-a-side or 7-a-side.' });
+    }
+    if (body.num_teams !== undefined && TEAM_SIZES.indexOf(Number(body.num_teams)) === -1) {
+          return res.status(400).json({ error: 'num_teams must be 4, 8, 16 or 32.' });
+    }
+    if (body.status !== undefined && STATUSES.indexOf(body.status) === -1) {
+          return res.status(400).json({ error: 'Invalid status.' });
+    }
+
+    const existingRes = await query('SELECT * FROM tournaments WHERE id = $1', [id]);
+    const existing = existingRes.rows[0];
+    if (!existing) return res.status(404).json({ error: 'Tournament not found.' });
+    const isCancelling = body.status === 'cancelled' && existing.status !== 'cancelled';
+
+const fields = ['name', 'category', 'format', 'num_teams', 'substitutes_allowed', 'start_date', 'registration_deadline', 'entry_fee', 'duration_notes', 'rules', 'status'];
   const sets = [];
   const values = [];
   let i = 1;
@@ -220,17 +240,44 @@ if (Array.isArray(body.invite_emails)) {
 }
 
 const tRes = await query('SELECT * FROM tournaments WHERE id = $1', [id]);
-  return res.status(200).json({ tournament: tRes.rows[0] });
+    const tournament = tRes.rows[0];
+
+    if (isCancelling) {
+          const teamsRes = await query('SELECT * FROM tournament_teams WHERE tournament_id = $1', [id]);
+          for (const team of teamsRes.rows) {
+                  try {
+                            await sendTournamentCancellationEmail(team, tournament);
+                  } catch (emailErr) {
+                            console.error('Failed to send tournament cancellation email:', emailErr);
+                  }
+          }
+    }
+
+    return res.status(200).json({ tournament });
 }
 
 // ---- Admin: delete/cancel a tournament ----
 async function handleDelete(req, res) {
-  const user = await requireAuth(req, res);
-  if (!user) return;
-  const id = Number(req.query.id);
-  if (!id) return res.status(400).json({ error: 'id is required.' });
-  await query('DELETE FROM tournaments WHERE id = $1', [id]);
-  return res.status(200).json({ success: true });
+    const user = await requireAuth(req, res);
+    if (!user) return;
+    const id = Number(req.query.id);
+    if (!id) return res.status(400).json({ error: 'id is required.' });
+
+    const tRes2 = await query('SELECT * FROM tournaments WHERE id = $1', [id]);
+    const tournament = tRes2.rows[0];
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found.' });
+
+    const teamsRes = await query('SELECT * FROM tournament_teams WHERE tournament_id = $1', [id]);
+    for (const team of teamsRes.rows) {
+          try {
+                  await sendTournamentCancellationEmail(team, tournament);
+          } catch (emailErr) {
+                  console.error('Failed to send tournament cancellation email:', emailErr);
+          }
+    }
+
+    await query('DELETE FROM tournaments WHERE id = $1', [id]);
+    return res.status(200).json({ success: true });
 }
 
 // ---- Public: register a team for a tournament ----
