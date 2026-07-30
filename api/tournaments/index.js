@@ -274,12 +274,14 @@ const teamRes = await query(
   );
   const team = teamRes.rows[0];
 
-for (const p of players) {
-  await query(
-    'INSERT INTO tournament_players (team_id, player_name, jersey_number, is_substitute) VALUES ($1,$2,$3,$4)',
-    [team.id, p.player_name, p.jersey_number || null, !!p.is_substitute]
-    );
-}
+const starters = parseInt(String(tournament.format).split('-')[0], 10) || 5;
+    for (let i = 0; i < players.length; i++) {
+          const p = players[i];
+          await query(
+                  'INSERT INTO tournament_players (team_id, player_name, jersey_number, is_substitute) VALUES ($1,$2,$3,$4)',
+                  [team.id, p.name, p.jersey_number || null, i >= starters]
+                );
+    }
 
 if (tournament.category === 'invite') {
   await query('UPDATE tournament_invite_emails SET used = true WHERE tournament_id = $1 AND lower(email) = $2', [tournament_id, normalizedEmail]);
