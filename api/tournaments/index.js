@@ -263,10 +263,13 @@ if (tournament.category === 'invite') {
   }
 }
 
-const existingRes = await query('SELECT id FROM tournament_teams WHERE tournament_id = $1 AND lower(email) = $2', [tournament_id, normalizedEmail]);
-  if (existingRes.rows.length) {
-    return res.status(400).json({ error: 'A team has already registered with this email for this tournament.' });
-  }
+const existingRes = await query('SELECT id, payment_status FROM tournament_teams WHERE tournament_id = $1 AND lower(email) = $2', [tournament_id, normalizedEmail]);
+    if (existingRes.rows.length) {
+          if (existingRes.rows[0].payment_status === 'paid') {
+                  return res.status(400).json({ error: 'A team has already registered with this email for this tournament.' });
+          }
+          await query('DELETE FROM tournament_teams WHERE id = $1', [existingRes.rows[0].id]);
+    }
 
 const teamRes = await query(
   'INSERT INTO tournament_teams (tournament_id, team_name, captain_name, contact_number, email) VALUES ($1,$2,$3,$4,$5) RETURNING *',
