@@ -193,7 +193,7 @@ function renderDetail(data) {
     html += '<div class="detail-grid">';
     html += settingsField('Category', capitalizeWord(t.category));
     html += settingsField('Format', capitalizeWord(t.format));
-    html += settingsField('Teams', (teams.filter(function (tm) { return tm.payment_status === 'paid'; }).length + ' / ' + t.num_teams);
+    html += settingsField('Teams', (teams.filter(function (tm) { return tm.payment_status === 'paid'; }).length) + ' / ' + t.num_teams);
     html += settingsField('Status', capitalizeWord(t.status));
     html += settingsField('Start Date', t.start_date || '-');
     html += settingsField('Registration Deadline', t.registration_deadline || '-');
