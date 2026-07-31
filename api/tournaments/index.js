@@ -190,9 +190,9 @@ return res.status(201).json({ tournament });
 async function handleUpdate(req, res) {
   const user = await requireAuth(req, res);
   if (!user) return;
-  const id = Number(req.query.id);
-  if (!id) return res.status(400).json({ error: 'id is required.' });
   const body = parseBody(req);
+    const id = Number(req.query.id || body.id);
+    if (!id) return res.status(400).json({ error: 'id is required.' });
 
     if (body.category !== undefined && CATEGORIES.indexOf(body.category) === -1) {
           return res.status(400).json({ error: 'category must be "open" or "invite".' });
