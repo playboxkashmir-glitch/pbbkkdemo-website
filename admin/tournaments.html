@@ -103,7 +103,7 @@
 <label>Category</label>
 <select id="t_category">
 <option value="open">Open For All</option>
-<option value="invite_only">Invite Only</option>
+<option value="invite">Invite Only</option>
 </select>
 </div>
 <div class="form-group">
@@ -142,6 +142,18 @@
 <div class="form-group">
 <label>Duration Notes</label>
 <input type="text" id="t_duration_notes" placeholder="e.g. 3 weekends">
+</div>
+<div class="form-group" id="statusFieldWrap" style="display:none;">
+  <label>Status</label>
+  <select id="t_status">
+    <option value="draft">Draft</option>
+    <option value="open">Open</option>
+    <option value="full">Full</option>
+    <option value="seeded">Seeded</option>
+    <option value="in_progress">In Progress</option>
+    <option value="completed">Completed</option>
+    <option value="cancelled">Cancelled</option>
+  </select>
 </div>
 </div>
 <div class="form-group" style="padding:0 1.5rem;">
