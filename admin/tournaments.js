@@ -42,8 +42,12 @@ async function loadTournaments() {
           }
           tbody.innerHTML = rows.map(renderTournamentRow).join('');
           rows.forEach(function (t) {
-                  const btn = document.getElementById('viewBtn_' + t.id);
-                  if (btn) btn.addEventListener('click', function () { openDetailModal(t.id); });
+                          const btn = document.getElementById('viewBtn_' + t.id);
+                          if (btn) btn.addEventListener('click', function () { openDetailModal(t.id); });
+                          const editBtn = document.getElementById('editBtn_' + t.id);
+                          if (editBtn) editBtn.addEventListener('click', function () { showEditTournamentModal(t.id); });
+                          const delBtn = document.getElementById('deleteBtn_' + t.id);
+                          if (delBtn) delBtn.addEventListener('click', function () { deleteTournament(t.id, t.name); });
           });
     } catch (err) {
           tbody.innerHTML = '<tr><td colspan="6">Error loading tournaments.</td></tr>';
@@ -60,7 +64,9 @@ function renderTournamentRow(t) {
           '<td>' + formatLabel + '</td>' +
           '<td>' + count + '</td>' +
           '<td>' + capitalizeWord(t.status) + '</td>' +
-          '<td><button id="viewBtn_' + t.id + '" class="btn-secondary">View</button></td>' +
+          '<td><button id="viewBtn_' + t.id + '" class="btn-secondary">View</button> ' +
+                    '<button id="editBtn_' + t.id + '" class="btn-secondary">Edit</button> ' +
+                    '<button id="deleteBtn_' + t.id + '" class="btn-danger">Delete</button></td>' +
           '</tr>';
 }
 
@@ -79,6 +85,7 @@ function showCreateTournamentModal() {
     document.getElementById('t_entry_fee').value = '';
     document.getElementById('t_duration_notes').value = '';
     document.getElementById('t_rules').value = '';
+    document.getElementById('statusFieldWrap').style.display = 'none';
     onCategoryChange();
     onNumTeamsChange();
     modal.style.display = 'flex';
@@ -89,17 +96,68 @@ function closeTournamentModal() {
     if (modal) modal.style.display = 'none';
 }
 
+async function showEditTournamentModal(id) {
+    const modal = document.getElementById('tournamentModal');
+    if (!modal) return;
+    try {
+        const res = await fetch('/api/tournaments?resource=admin-detail&id=' + encodeURIComponent(id), { credentials: 'include' });
+        if (!res.ok) throw new Error('load failed');
+        const data = await res.json();
+        const t = data.tournament;
+        const invites = (data.invite_emails || []).map(function (e) { return e.email || ''; });
+        document.getElementById('tournamentModalTitle').textContent = 'Edit Tournament';
+        document.getElementById('t_id').value = t.id;
+        document.getElementById('t_name').value = t.name || '';
+        document.getElementById('t_category').value = t.category;
+        document.getElementById('t_format').value = t.format;
+        document.getElementById('t_num_teams').value = t.num_teams;
+        document.getElementById('t_substitutes').value = t.substitutes_allowed != null ? t.substitutes_allowed : 3;
+        document.getElementById('t_start_date').value = t.start_date ? String(t.start_date).slice(0, 10) : '';
+        document.getElementById('t_registration_deadline').value = t.registration_deadline ? String(t.registration_deadline).slice(0, 10) : '';
+        document.getElementById('t_entry_fee').value = t.entry_fee || '';
+        document.getElementById('t_duration_notes').value = t.duration_notes || '';
+        document.getElementById('t_rules').value = t.rules || '';
+        document.getElementById('statusFieldWrap').style.display = 'block';
+        document.getElementById('t_status').value = t.status;
+        onCategoryChange();
+        onNumTeamsChange();
+        if (t.category === 'invite') renderInviteEmailInputs(invites);
+        modal.style.display = 'flex';
+    } catch (err) {
+        alert('Failed to load tournament for editing.');
+    }
+}
+
+async function deleteTournament(id, name) {
+    const msg = 'This will permanently delete the tournament' + (name ? ' "' + name + '"' : '') + '. If any teams have already registered, they will be notified by email that the tournament has been cancelled (and informed about a refund if they paid). This cannot be undone. Continue?';
+    if (!confirm(msg)) return;
+    try {
+        const res = await fetch('/api/tournaments?resource=admin&id=' + encodeURIComponent(id), {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        if (!res.ok) {
+            const errData = await res.json().catch(function () { return {}; });
+            alert(errData.error || 'Failed to delete tournament.');
+            return;
+        }
+        await loadTournaments();
+    } catch (err) {
+        alert('Failed to delete tournament.');
+    }
+}
+
 function onCategoryChange() {
     const cat = document.getElementById('t_category').value;
     const wrap = document.getElementById('inviteEmailsWrap');
     if (!wrap) return;
-    wrap.style.display = cat === 'invite_only' ? 'block' : 'none';
-    if (cat === 'invite_only') renderInviteEmailInputs();
+    wrap.style.display = cat === 'invite' ? 'block' : 'none';
+    if (cat === 'invite') renderInviteEmailInputs();
 }
 
 function onNumTeamsChange() {
     const cat = document.getElementById('t_category').value;
-    if (cat === 'invite_only') renderInviteEmailInputs();
+    if (cat === 'invite') renderInviteEmailInputs();
 }
 
 function renderInviteEmailInputs(existingEmails) {
@@ -122,15 +180,16 @@ async function saveTournament() {
           category: document.getElementById('t_category').value,
           format: document.getElementById('t_format').value,
           num_teams: parseInt(document.getElementById('t_num_teams').value, 10),
-          substitutes: parseInt(document.getElementById('t_substitutes').value, 10) || 3,
+          substitutes_allowed: parseInt(document.getElementById('t_substitutes').value, 10) || 3,
           start_date: document.getElementById('t_start_date').value,
           registration_deadline: document.getElementById('t_registration_deadline').value,
           entry_fee: parseFloat(document.getElementById('t_entry_fee').value) || 0,
           duration_notes: document.getElementById('t_duration_notes').value,
-          rules: document.getElementById('t_rules').value
+          rules: document.getElementById('t_rules').value,
+        status: id ? document.getElementById('t_status').value : undefined
     };
     if (!payload.name) { alert('Please enter a tournament name.'); return; }
-    if (payload.category === 'invite_only') {
+    if (payload.category === 'invite') {
           const inputs = document.querySelectorAll('.invite-email-input');
           payload.invite_emails = Array.from(inputs).map(function (inp) { return inp.value.trim(); });
     }
@@ -203,16 +262,19 @@ function renderDetail(data) {
     html += '<div class="quick-settings-form">';
     html += '<label>Status ' +
           '<select id="qs_status">' +
-          '<option value="open"' + (t.status === 'open' ? ' selected' : '') + '>Open</option>' +
-          '<option value="closed"' + (t.status === 'closed' ? ' selected' : '') + '>Closed</option>' +
-          '<option value="in_progress"' + (t.status === 'in_progress' ? ' selected' : '') + '>In Progress</option>' +
-          '<option value="completed"' + (t.status === 'completed' ? ' selected' : '') + '>Completed</option>' +
-          '</select></label>';
+'<option value="draft"' + (t.status === 'draft' ? ' selected' : '') + '>Draft</option>' +
+                    '<option value="open"' + (t.status === 'open' ? ' selected' : '') + '>Open</option>' +
+                    '<option value="full"' + (t.status === 'full' ? ' selected' : '') + '>Full</option>' +
+                    '<option value="seeded"' + (t.status === 'seeded' ? ' selected' : '') + '>Seeded</option>' +
+                    '<option value="in_progress"' + (t.status === 'in_progress' ? ' selected' : '') + '>In Progress</option>' +
+                    '<option value="completed"' + (t.status === 'completed' ? ' selected' : '') + '>Completed</option>' +
+                    '<option value="cancelled"' + (t.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option>' +
+        '</select></label>';
     html += '<label>Entry Fee <input type="number" id="qs_entry_fee" value="' + (t.entry_fee || 0) + '" /></label>';
     html += '<button id="saveQuickSettingsBtn" class="btn-primary">Save</button>';
     html += '</div>';
 
-  if (t.category === 'invite_only') {
+  if (t.category === 'invite') {
         html += '<h4>Invite Emails</h4>';
         html += '<div id="inviteEmailsDetailWrap">';
         inviteEmails.forEach(function (e, i) {
