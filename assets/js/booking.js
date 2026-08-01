@@ -527,7 +527,8 @@ function stopReservationTimer() {
 function createSlotHold() { if (!state.facilityDbId || !state.date || !(state.selectedHours && state.selectedHours.length)) return; var dateKey = toLocalDateKey(state.date); var slots = state.selectedHours.map(function (h) { return { start_time: (h % 24) + ':00', end_time: ((h + 1) % 24) + ':00' }; }); if (!state.holdToken) { state.holdToken = 'H' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); } fetch('/api/bookings?resource=hold', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ facility_id: state.facilityDbId, booking_date: dateKey, slots: slots, hold_token: state.holdToken }) }).catch(function (err) { console.error('Could not place slot hold:', err); }); }
 
 function initiatePayment(mode) {
-   state.paymentMode = (mode === 'reserve') ? 'reserve' : 'full';
+     if (window.PBKEnsureMaintenanceAccepted && !window.PBKEnsureMaintenanceAccepted(function () { initiatePayment(mode); })) { return; }
+        state.paymentMode = (mode === 'reserve') ? 'reserve' : 'full';
 var agreeBox = document.getElementById('agree-terms');
    if (agreeBox && !agreeBox.checked) {
       var wrap = document.getElementById('agree-terms-wrap');
