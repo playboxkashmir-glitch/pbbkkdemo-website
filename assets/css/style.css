@@ -1005,6 +1005,17 @@ section { padding: 100px 0; }
   .gi-large img { height: 250px; }
   .hero-stats { gap: 1rem; }
   .stat-divider { display: none; }
+    .stat-pill { font-size: 0.78rem; padding: 0.5rem 0.9rem; }
+    .container { padding: 0 1rem; }
+    .facility-info { padding: 1.25rem 1rem; }
+    .facility-footer { flex-wrap: nowrap; gap: 0.5rem; }
+    .facility-price { flex-wrap: nowrap; gap: 0.2rem; }
+    .price-from { display: none; }
+    .price-amount { font-size: 1.05rem; }
+    .price-strike { font-size: 0.68rem; }
+    .price-unit { font-size: 0.68rem; }
+    .offer-badge { font-size: 0.58rem; padding: 2px 5px; }
+    .btn-book-small { padding: 0.5rem 0.85rem; font-size: 0.78rem; white-space: nowrap; flex-shrink: 0; }
 }
 
 .coming-soon-card { opacity: 0.85; }
@@ -1029,3 +1040,7 @@ section { padding: 100px 0; }
   padding: 0.6rem 1.2rem;
   font-weight: 600;
 }
+
+
+.stat-pill { display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: rgba(255,255,255,0.92); padding: 0.55rem 1.1rem; border-radius: 50px; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.2px; backdrop-filter: blur(4px); }
+.stat-pill i { color: var(--accent); font-size: 0.95rem; }
