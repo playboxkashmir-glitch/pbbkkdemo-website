@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /register/
+Disallow: /db/
+Disallow: /lib/
+Disallow: /scripts/
+
+Sitemap: https://www.playboxkashmir.com/sitemap.xml
