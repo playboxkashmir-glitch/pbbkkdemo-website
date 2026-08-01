@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -382,7 +380,7 @@ section { padding: 100px 0; }
 .section-tag {
   display: inline-block;
   background: rgba(21,128,61,0.1);
-  color: var(--primary);
+  color: var(--primary-dark);
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 2px;
@@ -624,7 +622,7 @@ section { padding: 100px 0; }
 .feature-icon i { font-size: 1.6rem; color: var(--primary); transition: var(--transition); }
 .feature-card:hover .feature-icon i { color: var(--white); }
 
-.feature-card h4 {
+.feature-card h3 {
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--dark);
@@ -657,7 +655,7 @@ section { padding: 100px 0; }
   position: absolute;
   bottom: -1.5rem;
   right: -1.5rem;
-  background: var(--primary);
+  background: var(--primary-dark);
   color: var(--white);
   padding: 1.5rem;
   border-radius: var(--radius);
@@ -859,7 +857,7 @@ section { padding: 100px 0; }
 
 .ci-icon i { color: var(--white); font-size: 1rem; }
 
-.ci-text h4 { font-size: 0.85rem; color: var(--gray); font-weight: 600; margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 1px; }
+.ci-text h3 { font-size: 0.85rem; color: var(--gray); font-weight: 600; margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 1px; }
 .ci-text p { font-size: 0.95rem; color: var(--dark); line-height: 1.6; }
 
 .social-links { display: flex; gap: 0.75rem; margin-top: 2rem; }
@@ -921,7 +919,7 @@ section { padding: 100px 0; }
 
 .footer-social a:hover { background: var(--primary); color: var(--white); }
 
-.footer-links h5 { color: var(--white); font-weight: 700; margin-bottom: 1.25rem; font-size: 0.95rem; }
+.footer-links h4 { color: var(--white); font-weight: 700; margin-bottom: 1.25rem; font-size: 0.95rem; }
 .footer-links ul { list-style: none; }
 .footer-links ul li { margin-bottom: 0.6rem; }
 .footer-links ul li a { color: rgba(255,255,255,0.6); text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
