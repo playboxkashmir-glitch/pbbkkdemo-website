@@ -22,6 +22,25 @@ export default async function handler(req, res) {
     }
   }
 
+  if (req.method === 'POST' && req.query.log === 'consent') {
+    try {
+      const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+      const choice = String(body.choice || '').toLowerCase();
+      if (choice !== 'all' && choice !== 'mandatory' && choice !== 'none') {
+        return res.status(400).json({ error: 'choice must be all, mandatory, or none.' });
+      }
+      const page = typeof body.page === 'string' ? body.page.slice(0, 200) : null;
+      const forwarded = req.headers['x-forwarded-for'];
+      const ip = choice === 'all' ? (forwarded ? String(forwarded).split(',')[0].trim() : ((req.socket && req.socket.remoteAddress) || null)) : null;
+      const ua = choice === 'all' ? (req.headers['user-agent'] || null) : null;
+      await query('INSERT INTO consent_logs (consent_choice, ip_address, user_agent, page_path) VALUES ($1, $2, $3, $4)', [choice, ip, ua, page]);
+      return res.status(200).json({ ok: true });
+    } catch (err) {
+      console.error('Consent log error:', err);
+      return res.status(500).json({ error: 'Server error while logging consent.' });
+    }
+  }
+
 const user = await requireAuth(req, res);
   if (!user) return;
 
