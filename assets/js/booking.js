@@ -674,7 +674,8 @@ function showPaymentCancelled() {
 }
 
 function showConfirmation(paymentResponse) {
-document.querySelectorAll('div').forEach(function (el) {
+if (window.pbkTrackBookingComplete) { try { window.pbkTrackBookingComplete(); } catch (e) {} }
+     document.querySelectorAll('div').forEach(function (el) {
    if (el.style && el.style.position === 'fixed' && el.style.zIndex === '99999') {
       el.remove();
    }
