@@ -476,8 +476,11 @@ function updatePaymentModeUI() {
         var totalEl = document.getElementById('pay-total');
         var payBtnAmount = document.getElementById('btnPayAmount');
         var amountNow = state.totalAmount;
+        var reserveAmt = CONFIG.reserve_amount * Math.max(1, Math.ceil((state.basePrice || 0) / 2000));
+        var modeReserveBtn = document.getElementById('modeReserveBtn');
+        if (modeReserveBtn) modeReserveBtn.textContent = 'Reserve ₹' + reserveAmt;
+        if (reserveNote) reserveNote.innerHTML = '<i class="fas fa-info-circle"></i> Reserve your slot now for just ₹' + reserveAmt + ' + convenience fee, and pay the remaining balance later. Your slot is confirmed as soon as the reserve payment succeeds.';
         if (isReserveMode) {
-                   var reserveAmt = CONFIG.reserve_amount * Math.max(1, Math.ceil((state.basePrice || 0) / 2000));
                    var balance = Math.max(Math.round(((state.discountedSubtotal || 0) - reserveAmt) * 100) / 100, 0);
                    amountNow = Math.round((reserveAmt + CONFIG.convenience_fee) * 100) / 100;
                          if (reserveRow) { reserveRow.style.display = 'flex'; var prEl = document.getElementById('pay-reserve'); if (prEl) prEl.textContent = '₹' + reserveAmt; }
