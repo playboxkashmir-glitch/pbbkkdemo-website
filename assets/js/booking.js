@@ -477,7 +477,7 @@ function updatePaymentModeUI() {
         var payBtnAmount = document.getElementById('btnPayAmount');
         var amountNow = state.totalAmount;
         if (isReserveMode) {
-                   var reserveAmt = CONFIG.reserve_amount;
+                   var reserveAmt = CONFIG.reserve_amount * Math.max(1, Math.ceil((state.basePrice || 0) / 2000));
                    var balance = Math.max(Math.round(((state.discountedSubtotal || 0) - reserveAmt) * 100) / 100, 0);
                    amountNow = Math.round((reserveAmt + CONFIG.convenience_fee) * 100) / 100;
                          if (reserveRow) { reserveRow.style.display = 'flex'; var prEl = document.getElementById('pay-reserve'); if (prEl) prEl.textContent = '₹' + reserveAmt; }
