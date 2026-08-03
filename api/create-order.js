@@ -106,7 +106,10 @@ export default async function handler(req, res) {
         // totalAmount above -- Razorpay only ever sees whichever one amount is
         // actually being collected in this request.
         const paymentMode = body.payment_mode === 'reserve' ? 'reserve' : 'full';
-        const reserveAmount = Math.round((RESERVE_AMOUNT + convenienceFee) * 100) / 100;
+            // Tiered reserve: RESERVE_AMOUNT per every ₹2000 (or part thereof) of basePriceTotal
+            const reserveTierMultiplier = Math.max(1, Math.ceil(basePriceTotal / 2000));
+            const tieredReserveAmount = RESERVE_AMOUNT * reserveTierMultiplier;
+            const reserveAmount = Math.round((tieredReserveAmount + convenienceFee) * 100) / 100;
         const isReserve = paymentMode === 'reserve' && reserveAmount < totalAmount;
         const chargeAmount = isReserve ? reserveAmount : totalAmount;
         const balanceDue = isReserve ? Math.round((totalAmount - reserveAmount) * 100) / 100 : 0;
