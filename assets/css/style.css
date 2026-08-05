@@ -72,14 +72,22 @@ body {
 }
 
 .logo-play { color: var(--white); }
-.logo-box { color: var(--primary-light); }
+.logo-box { color: var(--white); }
 .logo-kashmir { 
-  color: var(--accent); 
+  color: var(--white); 
   font-size: 0.9rem; 
   font-weight: 600;
   margin-left: 4px;
   letter-spacing: 1px;
   text-transform: uppercase;
+}
+
+.logo-tm {
+  color: var(--white);
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: super;
+  margin-left: 2px;
 }
 
 .nav-menu {
