@@ -13,8 +13,10 @@
 .pk-empty,.pk-loading{text-align:center;color:#9ca3af;padding:2rem;}
 .pk-price-input{width:100px;padding:0.4rem 0.6rem;border:1px solid #e5e7eb;border-radius:6px;font-family:inherit;font-size:0.85rem;color:#111827;}
 .pk-price-input:focus{outline:none;border-color:#1a56db;}
-.pk-save-row{opacity:0.4;pointer-events:none;transition:opacity .2s;}
-.pk-save-row.dirty{opacity:1;pointer-events:auto;}
+.pk-save-btn{background:#e5e7eb;color:#9ca3af;border:none;padding:0.45rem 0.9rem;border-radius:6px;cursor:not-allowed;font-weight:600;font-size:0.8rem;transition:background .2s,color .2s;}
+.pk-save-btn.dirty{background:#15803d;color:#fff;cursor:pointer;}
+.pk-saved-msg{color:#15803d;font-size:0.78rem;font-weight:600;margin-left:0.5rem;opacity:0;transition:opacity .3s;}
+.pk-saved-msg.show{opacity:1;}
 .pk-sport-heading{font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#6b7280;padding:0.9rem 1.25rem 0.4rem;}
 </style>
 </head>
@@ -49,7 +51,7 @@
 <button class="sidebar-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
 <div class="header-title">
 <h1>Pricing</h1>
-<p>Quickly review and update base &amp; peak rates for every facility</p>
+<p>Quickly review and update base &amp; peak rates for every facility. Click <strong>Save</strong> next to a row to publish the change to the live website immediately, no separate deploy needed.</p>
 </div>
 <div class="header-actions">
 <div class="header-date" id="headerDate"></div>
@@ -116,19 +118,23 @@ function renderPricingRow(f) {
     '<td>' + escapeHtml(f.option_name) + '</td>' +
     '<td><input type="number" class="pk-price-input" min="0" step="1" value="' + f.base_price + '" data-field="base" oninput="markDirty(' + f.id + ')" id="base-' + f.id + '"></td>' +
     '<td><input type="number" class="pk-price-input" min="0" step="1" value="' + f.peak_price + '" data-field="peak" oninput="markDirty(' + f.id + ')" id="peak-' + f.id + '"></td>' +
-    '<td><span class="pk-save-row" id="save-wrap-' + f.id + '"><button class="btn-icon" title="Save" onclick="savePrice(' + f.id + ')"><i class="fas fa-check"></i></button></span></td>' +
+    '<td><button class="pk-save-btn" id="save-btn-' + f.id + '" onclick="savePrice(' + f.id + ')" disabled>Save</button><span class="pk-saved-msg" id="saved-msg-' + f.id + '">Saved &#10003;</span></td>' +
     '</tr>';
 }
 
 function markDirty(id) {
-  const el = document.getElementById('save-wrap-' + id);
-  if (el) el.classList.add('dirty');
-}
+  const btn = document.getElementById('save-btn-' + id);
+  if (btn) { btn.classList.add('dirty'); btn.disabled = false; }
+  const msg = document.getElementById('saved-msg-' + id);
+  if (msg) msg.classList.remove('show');
+  }
 
 async function savePrice(id) {
   const base = document.getElementById('base-' + id).value;
   const peak = document.getElementById('peak-' + id).value;
   if (base === '' || peak === '') { alert('Both base and peak price are required.'); return; }
+  const btn = document.getElementById('save-btn-' + id);
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
   try {
     const res = await fetch('/api/facilities?id=' + id, {
       method: 'PATCH',
@@ -136,11 +142,21 @@ async function savePrice(id) {
       credentials: 'include',
       body: JSON.stringify({ base_price: Number(base), peak_price: Number(peak) })
     });
-    if (!res.ok) { const data = await res.json(); alert(data.error || 'Could not update pricing.'); return; }
-    const wrap = document.getElementById('save-wrap-' + id);
-    if (wrap) wrap.classList.remove('dirty');
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error || 'Could not update pricing.');
+      if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+      return;
+    }
+    if (btn) { btn.classList.remove('dirty'); btn.textContent = 'Save'; }
+    const msg = document.getElementById('saved-msg-' + id);
+    if (msg) {
+      msg.classList.add('show');
+      setTimeout(() => msg.classList.remove('show'), 2500);
+    }
   } catch (err) {
     alert('Network error. Please try again.');
+    if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
   }
 }
 async function loadConvenienceFee(){try{const res=await fetch('/api/settings');const data=await res.json();const el=document.getElementById('convenienceFeeInput');if(el&&data&&data.convenience_fee!==undefined){const v=parseFloat(data.convenience_fee);if(!isNaN(v))el.value=v;}}catch(err){console.error('Load convenience fee error:',err);}} async function saveConvenienceFee(){const val=document.getElementById('convenienceFeeInput').value;if(val===''){alert('Enter a convenience fee amount.');return;}try{const res=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({key:'convenience_fee',value:Number(val)})});const data=await res.json();if(!res.ok){alert(data.error||'Could not update convenience fee.');return;}alert('Convenience fee updated.');}catch(err){alert('Network error. Please try again.');}} </script>
