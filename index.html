@@ -419,9 +419,9 @@
       }
     } catch (e) {}
     var discounted = Math.round(basePrice * (1 - pct / 100));
-    if (strikeEl) strikeEl.textContent = '₹' + basePrice.toLocaleString('en-IN');
+    if (strikeEl) { strikeEl.textContent = '₹' + basePrice.toLocaleString('en-IN'); strikeEl.style.display = pct > 0 ? '' : 'none'; }
     priceEl.textContent = '₹' + discounted.toLocaleString('en-IN');
-    if (badgeEl) badgeEl.textContent = pct + '% OFF';
+    if (badgeEl) { badgeEl.textContent = pct + '% OFF'; badgeEl.style.display = pct > 0 ? '' : 'none'; }
   } catch (err) {
     console.error('Could not load live pricing', err);
   }

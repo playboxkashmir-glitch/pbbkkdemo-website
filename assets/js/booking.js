@@ -130,7 +130,7 @@ function updateStaticPriceDisplays() {
    });
 }
 
-function goToStep(stepNum) {
+function applyInauguralOfferVisibility() { var pct = parseFloat(CONFIG.inaugural_discount_pct); var active = !isNaN(pct) && pct > 0; document.querySelectorAll('.inaugural-offer-note').forEach(function (el) { el.style.display = active ? '' : 'none'; }); document.querySelectorAll('.inaugural-pct-text').forEach(function (el) { el.textContent = pct; }); document.querySelectorAll('.sport-price .offer-badge').forEach(function (el) { if (active) { el.textContent = pct + '% OFF'; el.style.display = ''; } else { el.style.display = 'none'; } }); document.querySelectorAll('.sport-price .price-strike').forEach(function (el) { el.style.display = active ? '' : 'none'; }); var inaugLabel = document.getElementById('inauguralLabelText'); if (inaugLabel) inaugLabel.textContent = active ? ('Inaugural Offer (-' + pct + '%)') : 'Inaugural Offer'; } function goToStep(stepNum) {
    const currentStep = document.getElementById('step-' + state.step);
    const nextStep = document.getElementById('step-' + stepNum);
    if (!nextStep) return;
@@ -335,7 +335,7 @@ function renderSummaryStep3() {
 }
 
 function buildSummaryRows() {
-const rows = []; rows.push(['Sport', state.sportName]); rows.push(['Facility', state.facilityName]); rows.push(['Date', state.dateFormatted]); rows.push(['Time Slot', state.slotLabel]); rows.push(['Turf Price', '₹' + state.basePrice]); rows.push(['Inaugural Offer (-' + CONFIG.inaugural_discount_pct + '%)', '-₹' + state.inauguralDiscount]); if (state.promoDiscount > 0) { rows.push(['Promo (' + state.promoCode + ')', '-₹' + state.promoDiscount]); } rows.push(['Subtotal', '₹' + state.discountedSubtotal]);
+const rows = []; rows.push(['Sport', state.sportName]); rows.push(['Facility', state.facilityName]); rows.push(['Date', state.dateFormatted]); rows.push(['Time Slot', state.slotLabel]); rows.push(['Turf Price', '₹' + state.basePrice]); if (state.inauguralDiscount > 0) { rows.push(['Inaugural Offer (-' + CONFIG.inaugural_discount_pct + '%)', '-₹' + state.inauguralDiscount]); } if (state.promoDiscount > 0) { rows.push(['Promo (' + state.promoCode + ')', '-₹' + state.promoDiscount]); } rows.push(['Subtotal', '₹' + state.discountedSubtotal]);
    return rows.map(function (r) {
       return '<div class="summary-row"><span class="label">' + r[0] + '</span><span class="value">' + r[1] + '</span></div>';
    }).join('');
@@ -768,7 +768,7 @@ function hideLoading() {
 
 document.addEventListener('DOMContentLoaded', async () => {
 document.body.classList.add('facilities-loading');
-     await Promise.all([loadFacilities(), loadSettings()]);
+     await Promise.all([loadFacilities(), loadSettings()]); updateStaticPriceDisplays(); applyInauguralOfferVisibility();
 
                           const urlParams = new URLSearchParams(window.location.search);
    const sportParam = urlParams.get('sport');
