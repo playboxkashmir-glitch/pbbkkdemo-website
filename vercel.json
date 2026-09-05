@@ -1,4 +1,7 @@
 {
+      "crons": [
+            { "path": "/api/reports/summary?resource=daily-report", "schedule": "30 18 * * *" }
+      ],
       "routes": [
             { "src": "^/$", "has": [{ "type": "host", "value": "register.playboxkashmir.com" }], "dest": "/register/index.html", "continue": true },
             { "src": "^/(?!api/|register/|assets/|favicon.png)(.*)$", "has": [{ "type": "host", "value": "register.playboxkashmir.com" }], "dest": "/register/$1", "continue": true }, { "src": "^/lib(?:/.*)?$", "status": 404 },
