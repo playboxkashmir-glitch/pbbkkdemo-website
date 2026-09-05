@@ -4,50 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tournament Registration - PlayBox Kashmir™</title>
-<link rel="icon" type="image/png" href="../favicon.png">
+<link rel="icon" type="image/png" href="../favicon.png?v=2">
+<link rel="shortcut icon" type="image/png" href="../favicon.png?v=2">
+<link rel="apple-touch-icon" href="../favicon.png?v=2">
+<link rel="canonical" href="https://register.playboxkashmir.com/tournament.html">
 <meta name="description" content="Register your team for a PlayBox Kashmir™ tournament.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Tournament Registration - PlayBox Kashmir™">
+<meta property="og:description" content="Register your team for a PlayBox Kashmir™ tournament.">
+<meta property="og:image" content="https://www.playboxkashmir.com/favicon.png">
+<meta property="og:url" content="https://register.playboxkashmir.com/tournament.html">
 <link rel="stylesheet" href="../assets/css/style.css">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
-<style>
-body.register-page{background:#f9fafb;min-height:100vh;}
-.reg-hero{text-align:center;padding:3rem 1.5rem 1.5rem;}
-.reg-hero h1{font-size:2rem;color:#111827;margin-bottom:0.5rem;}
-.reg-hero p{color:#6b7280;}
-.reg-container{max-width:900px;margin:0 auto;padding:0 1.5rem 4rem;}
-.tourn-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.25rem;}
-.tourn-card{background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,0.06);border:1px solid #eee;cursor:pointer;transition:transform .2s,box-shadow .2s;}
-.tourn-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.1);}
-.tourn-card-badge{display:inline-block;font-size:0.7rem;font-weight:700;padding:4px 10px;border-radius:12px;margin-bottom:0.75rem;}
-.tourn-card-badge.open{background:#e6f4ea;color:#15803d;}
-.tourn-card-badge.invite_only{background:#fef3c7;color:#92400e;}
-.tourn-card h3{font-size:1.15rem;margin-bottom:0.4rem;color:#111827;}
-.tourn-card p{color:#6b7280;font-size:0.9rem;margin-bottom:0.3rem;}
-.tourn-card .tourn-fee{font-weight:700;color:#15803d;margin-top:0.5rem;}
-.reg-form-card{background:#fff;border-radius:16px;padding:2rem;box-shadow:0 2px 12px rgba(0,0,0,0.06);border:1px solid #eee;}
-.reg-form-card h2{margin-bottom:0.25rem;color:#111827;}
-.reg-form-card .reg-form-sub{color:#6b7280;margin-bottom:1.5rem;font-size:0.9rem;}
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;}
-.form-group-full{margin-bottom:1rem;}
-.form-group-full label,.form-row label{display:block;font-size:0.85rem;font-weight:600;color:#374151;margin-bottom:0.35rem;}
-.form-group-full input,.form-row input,.form-group-full select{width:100%;padding:0.6rem 0.75rem;border:1px solid #d1d5db;border-radius:8px;font-size:0.95rem;}
-.player-row{display:grid;grid-template-columns:2fr 1fr;gap:0.75rem;margin-bottom:0.6rem;}
-.player-row input{padding:0.55rem 0.7rem;border:1px solid #d1d5db;border-radius:8px;}
-.eligibility-msg{display:none;margin:0.75rem 0;padding:0.75rem 1rem;border-radius:8px;font-size:0.9rem;}
-.eligibility-msg.error{display:block;background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;}
-.eligibility-msg.success{display:block;background:#f0fdf4;color:#15803d;border:1px solid #86efac;}
-.reg-fee-bar{display:flex;justify-content:space-between;align-items:center;margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid #e5e7eb;}
-.reg-fee-bar .fee-amount{font-size:1.4rem;font-weight:800;color:#111827;}
-.btn-pay-register{background:#15803d;color:#fff;border:none;padding:0.85rem 1.75rem;border-radius:10px;font-weight:700;font-size:1rem;cursor:pointer;}
-.btn-pay-register:disabled{opacity:0.55;cursor:not-allowed;}
-.btn-back-step{background:none;border:none;color:#6b7280;font-weight:600;cursor:pointer;margin-bottom:1rem;}
-.confirm-screen{text-align:center;padding:3rem 1.5rem;}
-.confirm-screen i{font-size:3.5rem;color:#15803d;margin-bottom:1rem;}
-.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;z-index:999;}
-.agree-terms{display:flex;align-items:flex-start;gap:10px;margin:16px 0;padding:12px 14px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;font-size:14px;line-height:1.5;color:#374151;}
-.agree-terms input{margin-top:3px;width:18px;height:18px;flex:0 0 auto;cursor:pointer;accent-color:#15803d;}
-.agree-terms a{color:#15803d;text-decoration:underline;}
-</style>
+<link rel="stylesheet" href="../assets/css/register.css">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<link rel="preload" as="style" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"></noscript>
+<noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css"></noscript>
 </head>
 <body class="register-page">
 
@@ -144,5 +116,6 @@ body.register-page{background:#f9fafb;min-height:100vh;}
 
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script src="register.js"></script>
+<script src="../assets/js/main.js"></script>
 </body>
 </html>
