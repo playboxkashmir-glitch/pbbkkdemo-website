@@ -5,6 +5,7 @@
 
 import { query } from '../../lib/db.js';
 import { requireAuth } from '../../lib/auth.js';
+import { runDailyReport } from '../../lib/dailyReport.js';
 
 const PEAK_BUCKETS = [
   { key: 'morning', label: 'Morning', range: '6-9 AM' },
@@ -14,6 +15,14 @@ const PEAK_BUCKETS = [
   ];
 
 export default async function handler(req, res) {
+  // Invoked once a day by the Vercel Cron Job in vercel.json (an
+  // unauthenticated request as far as the admin session goes - Vercel
+  // Cron cannot hold the admin login cookie), so this branch is checked
+  // first and uses its own shared-secret check instead of requireAuth.
+  if (req.query.resource === 'daily-report') {
+    return handleDailyReport(req, res);
+  }
+
     const user = requireAuth(req, res);
     if (!user) return;
 
@@ -127,5 +136,36 @@ export default async function handler(req, res) {
   } catch (err) {
         console.error('Reports summary error:', err);
         return res.status(500).json({ error: 'Server error while generating report summary.' });
+  }
+}
+
+// ---- Daily "Today's Booking Sheet" email, triggered by Vercel Cron ----
+// Accepts either the admin session cookie (so it can also be triggered
+// manually from the admin panel / for testing) or a
+// `Authorization: Bearer <CRON_SECRET>` header, which is what Vercel Cron
+// is configured (in vercel.json) to send. Without a configured
+// CRON_SECRET this endpoint refuses every request, so it fails closed
+// rather than being left open to the public internet.
+async function handleDailyReport(req, res) {
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    res.setHeader('Allow', 'GET, POST');
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = req.headers.authorization || '';
+  const hasValidCronSecret = !!cronSecret && authHeader === `Bearer ${cronSecret}`;
+
+  if (!hasValidCronSecret) {
+    const user = requireAuth(req, res);
+    if (!user) return;
+  }
+
+  try {
+    const result = await runDailyReport();
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('Daily report error:', err);
+    return res.status(500).json({ error: 'Server error while generating the daily report.' });
   }
 }
