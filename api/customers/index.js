@@ -5,13 +5,17 @@
 
 import { query } from '../../lib/db.js';
 import { requireAuth } from '../../lib/auth.js';
-import { sendMembershipSignupEmail } from '../../lib/email.js';
 
 const BILLING_CYCLES = ['monthly', 'quarterly', 'half_yearly', 'annual', 'one_time'];
 const DISCOUNT_TYPES = ['none', 'percent', 'flat'];
-// 'pending' covers a public sign-up (register.playboxkashmir.com) that is
-// awaiting staff review and payment; admin-created members go straight to 'active'.
+// 'pending' is kept as a status admin can still set by hand from the edit-member
+// screen (e.g. to park someone mid-review); the public register.playboxkashmir.com
+// flow itself never creates a 'pending' row any more - Razorpay payment is
+// required up front and the webhook creates the row straight into 'active'.
 const MEMBERSHIP_STATUSES = ['pending', 'active', 'expired', 'cancelled'];
+// Bump this whenever the membership Terms & Conditions text changes, so the
+// version accepted at payment time is recorded on the membership row.
+const MEMBERSHIP_TERMS_VERSION = '2026-09-06';
 
 function parseBody(req) {
   return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
@@ -84,6 +88,18 @@ async function ensureMembershipTables() {
     ALTER TABLE memberships ADD CONSTRAINT memberships_status_check
       CHECK (status = ANY (ARRAY['pending'::text, 'active'::text, 'expired'::text, 'cancelled'::text]));
   `);
+  // Columns needed for the paid public sign-up flow: a membership created
+  // from register.playboxkashmir.com is only ever inserted once Razorpay
+  // confirms payment (see api/razorpay-webhook.js), and we keep the payment
+  // + terms-acceptance trail on the row for support/audit purposes.
+  await query(`
+    ALTER TABLE memberships ADD COLUMN IF NOT EXISTS razorpay_order_id TEXT;
+    ALTER TABLE memberships ADD COLUMN IF NOT EXISTS razorpay_payment_id TEXT;
+    ALTER TABLE memberships ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ;
+    ALTER TABLE memberships ADD COLUMN IF NOT EXISTS terms_version TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_razorpay_payment_id
+      ON memberships (razorpay_payment_id) WHERE razorpay_payment_id IS NOT NULL;
+  `);
   membershipTablesReady = true;
 }
 
@@ -104,7 +120,7 @@ function addCycle(dateStr, cycle) {
 // Resources that touch the membership tables - ensure they exist first.
 const MEMBERSHIP_RESOURCES = new Set([
   'plans', 'plan-detail', 'plan', 'members', 'member-detail', 'member',
-  'redeem-slot', 'public-plans', 'signup'
+  'redeem-slot', 'public-plans', 'membership-order'
 ]);
 
 export default async function handler(req, res) {
@@ -128,9 +144,10 @@ export default async function handler(req, res) {
       if (resource === 'plan') return handleCreatePlan(req, res);
       if (resource === 'member') return handleCreateMember(req, res);
       if (resource === 'redeem-slot') return handleRedeemSlot(req, res);
-      // Public, unauthenticated: a customer requesting a plan from
-      // register.playboxkashmir.com. Lands as 'pending' for staff review.
-      if (resource === 'signup') return handleSignup(req, res);
+      // Public, unauthenticated: a customer on register.playboxkashmir.com
+      // starting payment for a plan. Only creates a Razorpay order - the
+      // membership itself is created 'active' by the webhook once paid.
+      if (resource === 'membership-order') return handleCreateMembershipOrder(req, res);
       res.setHeader('Allow', 'GET');
       return res.status(405).json({ error: 'Unknown resource for POST.' });
     }
@@ -334,16 +351,29 @@ async function handleListPublicPlans(req, res) {
   return res.status(200).json({ plans: rows });
 }
 
-// Public sign-up from register.playboxkashmir.com. Creates the membership as
-// 'pending' with no payment recorded - staff confirm payment and flip it to
-// 'active' from the admin Memberships page, the same way a walk-in enrollment
-// is handled, just started by the customer instead of a staff member.
-async function handleSignup(req, res) {
+// Public sign-up from register.playboxkashmir.com. Does NOT touch the
+// memberships table directly - it only creates a Razorpay order for the
+// plan's price (computed here from the DB, never trusted from the client)
+// and hands the customer's details back to Razorpay in the order's `notes`.
+// The membership row itself is only ever created once Razorpay confirms the
+// payment via the server-to-server webhook (see api/razorpay-webhook.js),
+// at which point it goes straight to 'active' - there is no unpaid/pending
+// row sitting around waiting on a payment that might never complete.
+async function handleCreateMembershipOrder(req, res) {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret) {
+    return res.status(500).json({ error: 'Payment gateway is not configured.' });
+  }
+
   const body = parseBody(req);
   const { plan_id, member_name, member_email, member_phone, notes } = body;
 
   if (!plan_id || !member_name || !member_email || !member_phone) {
     return res.status(400).json({ error: 'plan_id, member_name, member_email and member_phone are required.' });
+  }
+  if (body.terms_accepted !== true) {
+    return res.status(400).json({ error: 'You must accept the Membership Terms and Conditions before payment.' });
   }
   const emailStr = String(member_email).trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {
@@ -358,33 +388,45 @@ async function handleSignup(req, res) {
   if (!planRes.rows.length) return res.status(404).json({ error: 'Membership plan not found or no longer available.' });
   const plan = planRes.rows[0];
 
-  const startDate = new Date().toISOString().slice(0, 10);
-  const endDate = addCycle(startDate, plan.billing_cycle);
-  const resetAt = addCycle(startDate, plan.complimentary_frequency);
-
-  const insertRes = await query(
-    `INSERT INTO memberships
-      (plan_id, member_name, member_email, member_phone, start_date, end_date,
-       complimentary_slots_total, complimentary_slots_remaining, complimentary_slots_reset_at,
-       amount_paid, payment_method, notes, status)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending')
-     RETURNING *`,
-    [
-      plan.id, String(member_name).trim(), emailStr, phoneStr,
-      startDate, endDate, plan.complimentary_slots, plan.complimentary_slots, resetAt,
-      0, 'pending', notes ? String(notes).trim().slice(0, 1000) : null
-    ]
-  );
-  const membership = insertRes.rows[0];
-
-  // Best-effort: a failed confirmation email should never fail the sign-up itself.
-  try {
-    await sendMembershipSignupEmail(membership, plan);
-  } catch (emailErr) {
-    console.error('Membership sign-up confirmation email failed:', emailErr);
+  const amount = Math.round(Number(plan.price) * 100);
+  if (!Number.isInteger(amount) || amount <= 0) {
+    return res.status(400).json({ error: 'This plan has no payable price configured.' });
   }
 
-  return res.status(201).json({ member: membership });
+  const notesStr = notes ? String(notes).trim().slice(0, 1000) : '';
+
+  const orderNotes = {
+    type: 'membership',
+    plan_id: String(plan.id),
+    member_name: String(member_name).trim().slice(0, 200),
+    member_email: emailStr,
+    member_phone: phoneStr,
+    member_notes: notesStr,
+    terms_accepted: true,
+    terms_version: MEMBERSHIP_TERMS_VERSION,
+  };
+
+  const auth = Buffer.from(keyId + ':' + keySecret).toString('base64');
+  const rpRes = await fetch('https://api.razorpay.com/v1/orders', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Basic ' + auth,
+    },
+    body: JSON.stringify({
+      amount,
+      currency: 'INR',
+      notes: orderNotes,
+    }),
+  });
+
+  const data = await rpRes.json();
+  if (!rpRes.ok) {
+    const message = (data && data.error && data.error.description) || 'Could not start payment.';
+    return res.status(rpRes.status).json({ error: message });
+  }
+
+  return res.status(200).json({ id: data.id, amount: data.amount, currency: data.currency });
 }
 
 // ---------------- Members (plan enrollments) ----------------
