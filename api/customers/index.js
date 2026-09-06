@@ -74,6 +74,16 @@ async function ensureMembershipTables() {
     );
     CREATE INDEX IF NOT EXISTS idx_membership_redemptions_membership ON membership_redemptions (membership_id);
   `);
+  // The memberships table already existed in production (created before this
+  // module's schema.sql documentation was written) with a status CHECK
+  // constraint that only allowed 'active' / 'expired' / 'cancelled'. Public
+  // sign-ups need 'pending' too, so widen that constraint here - safe to run
+  // every cold start since it drops and recreates the same-named constraint.
+  await query(`
+    ALTER TABLE memberships DROP CONSTRAINT IF EXISTS memberships_status_check;
+    ALTER TABLE memberships ADD CONSTRAINT memberships_status_check
+      CHECK (status = ANY (ARRAY['pending'::text, 'active'::text, 'expired'::text, 'cancelled'::text]));
+  `);
   membershipTablesReady = true;
 }
 
