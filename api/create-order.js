@@ -34,6 +34,7 @@ export default async function handler(req, res) {
         const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
         const { facility_id, booking_date, hours, promo_code } = body;
         const currency = body.currency || 'INR';
+        const customerEmail = body.notes && body.notes.customer_email ? String(body.notes.customer_email).trim() : '';
 
         if (!facility_id || !booking_date || !Array.isArray(hours) || hours.length === 0 || hours.length > 12) {
             return res.status(400).json({ error: 'facility_id, booking_date and a valid hours[] array (1-12 entries) are required.' });
@@ -45,7 +46,7 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'hours[] must contain valid hour numbers.' });
         }
 
-        const facRows = await query('SELECT id, base_price, peak_price FROM facilities WHERE option_id = $1 AND is_active = true', [facility_id]);
+        const facRows = await query('SELECT id, base_price, peak_price, sport_key FROM facilities WHERE option_id = $1 AND is_active = true', [facility_id]);
         if (facRows.rows.length === 0) {
             return res.status(400).json({ error: 'Unknown or unavailable facility.' });
         }
@@ -83,6 +84,43 @@ export default async function handler(req, res) {
         const inauguralDiscount = Math.round(basePriceTotal * INAUGURAL_DISCOUNT_PCT / 100);
         const afterInaugural = basePriceTotal - inauguralDiscount;
 
+        // Membership discount: looked up server-side by the customer's entered
+        // email (never trusted from the client), matched against this facility's
+        // sport via the plan's applicable_sports JSONB array. Applied automatically,
+        // no promo code required, and stacks after the inaugural discount.
+        let membershipDiscount = 0;
+        let membershipPlanName = null;
+        if (customerEmail) {
+            const memberRows = await query(
+                `SELECT p.name AS plan_name, p.discount_type, p.discount_value, p.discount_max_amount
+                 FROM memberships m
+                 JOIN membership_plans p ON p.id = m.plan_id
+                 WHERE lower(m.member_email) = lower($1)
+                   AND m.status = 'active'
+                   AND m.end_date >= CURRENT_DATE
+                   AND (p.applicable_sports = '[]'::jsonb OR p.applicable_sports @> to_jsonb($2::text))
+                 ORDER BY m.created_at DESC
+                 LIMIT 1`,
+                [customerEmail, facility.sport_key || '']
+            );
+            if (memberRows.rows.length) {
+                const plan = memberRows.rows[0];
+                const discountValue = Number(plan.discount_value) || 0;
+                if (plan.discount_type === 'percent' && discountValue > 0) {
+                    let pctDiscount = Math.round(afterInaugural * discountValue / 100);
+                    if (plan.discount_max_amount !== null && plan.discount_max_amount !== undefined) {
+                        const cap = Number(plan.discount_max_amount);
+                        if (!isNaN(cap) && cap > 0) pctDiscount = Math.min(pctDiscount, cap);
+                    }
+                    membershipDiscount = pctDiscount;
+                } else if (plan.discount_type === 'flat' && discountValue > 0) {
+                    membershipDiscount = Math.min(discountValue, afterInaugural);
+                }
+                if (membershipDiscount > 0) membershipPlanName = plan.plan_name;
+            }
+        }
+        const afterMembership = afterInaugural - membershipDiscount;
+
         let promoDiscount = 0;
         let appliedPromoCode = null;
         if (promo_code) {
@@ -90,14 +128,14 @@ export default async function handler(req, res) {
             if (promoRows.rows.length) {
                 const promo = promoRows.rows[0];
                 const minAmount = Number(promo.min_amount);
-                if (afterInaugural >= minAmount) {
-                    promoDiscount = promo.type === 'percent' ? Math.round(afterInaugural * Number(promo.value) / 100) : Number(promo.value);
+                if (afterMembership >= minAmount) {
+                    promoDiscount = promo.type === 'percent' ? Math.round(afterMembership * Number(promo.value) / 100) : Number(promo.value);
                     appliedPromoCode = promo.code;
                 }
             }
         }
 
-        const discountedSubtotal = afterInaugural - promoDiscount;
+        const discountedSubtotal = afterMembership - promoDiscount;
         const totalAmount = Math.round((discountedSubtotal + convenienceFee) * 100) / 100;
 
         // "Reserve" bookings let a customer hold a slot by paying a small flat
@@ -125,6 +163,8 @@ export default async function handler(req, res) {
             booking_date: booking_date,
             rate: basePriceTotal,
             promo_code: appliedPromoCode,
+            membership_plan: membershipPlanName,
+            membership_discount: membershipDiscount || undefined,
             amount: totalAmount,
             is_reserve: isReserve,
             full_amount: totalAmount,
@@ -163,6 +203,8 @@ export default async function handler(req, res) {
             full_amount: totalAmount,
             reserve_amount: isReserve ? reserveAmount : null,
             balance_due: balanceDue,
+            membership_discount: membershipDiscount,
+            membership_plan: membershipPlanName,
         })
     } catch (err) {
         console.error('Create order error:', err);
