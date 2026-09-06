@@ -5,13 +5,76 @@
 
 import { query } from '../../lib/db.js';
 import { requireAuth } from '../../lib/auth.js';
+import { sendMembershipSignupEmail } from '../../lib/email.js';
 
 const BILLING_CYCLES = ['monthly', 'quarterly', 'half_yearly', 'annual', 'one_time'];
 const DISCOUNT_TYPES = ['none', 'percent', 'flat'];
-const MEMBERSHIP_STATUSES = ['active', 'expired', 'cancelled'];
+// 'pending' covers a public sign-up (register.playboxkashmir.com) that is
+// awaiting staff review and payment; admin-created members go straight to 'active'.
+const MEMBERSHIP_STATUSES = ['pending', 'active', 'expired', 'cancelled'];
 
 function parseBody(req) {
   return typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+}
+
+// The membership tables were added after this module was first built, so
+// this creates them on first use instead of requiring a manual migration
+// step in production. Cheap once the tables exist (IF NOT EXISTS is a no-op)
+// and cached per warm serverless instance so it only runs once per cold start.
+let membershipTablesReady = false;
+async function ensureMembershipTables() {
+  if (membershipTablesReady) return;
+  await query(`
+    CREATE TABLE IF NOT EXISTS membership_plans (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      price NUMERIC(10,2) NOT NULL DEFAULT 0,
+      billing_cycle TEXT NOT NULL DEFAULT 'monthly',
+      discount_type TEXT NOT NULL DEFAULT 'none',
+      discount_value NUMERIC(10,2) NOT NULL DEFAULT 0,
+      discount_max_amount NUMERIC(10,2),
+      complimentary_slots INTEGER NOT NULL DEFAULT 0,
+      complimentary_frequency TEXT NOT NULL DEFAULT 'monthly',
+      allow_reserve_without_payment BOOLEAN NOT NULL DEFAULT false,
+      priority_booking BOOLEAN NOT NULL DEFAULT false,
+      max_advance_booking_days INTEGER,
+      applicable_sports JSONB NOT NULL DEFAULT '[]'::jsonb,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ
+    );
+    CREATE TABLE IF NOT EXISTS memberships (
+      id SERIAL PRIMARY KEY,
+      plan_id INTEGER NOT NULL REFERENCES membership_plans(id),
+      member_name TEXT NOT NULL,
+      member_email TEXT NOT NULL,
+      member_phone TEXT NOT NULL,
+      start_date DATE NOT NULL,
+      end_date DATE NOT NULL,
+      complimentary_slots_total INTEGER NOT NULL DEFAULT 0,
+      complimentary_slots_remaining INTEGER NOT NULL DEFAULT 0,
+      complimentary_slots_reset_at DATE,
+      amount_paid NUMERIC(10,2) NOT NULL DEFAULT 0,
+      payment_method TEXT NOT NULL DEFAULT 'cash',
+      notes TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS idx_memberships_plan ON memberships (plan_id);
+    CREATE INDEX IF NOT EXISTS idx_memberships_email ON memberships (member_email);
+    CREATE TABLE IF NOT EXISTS membership_redemptions (
+      id SERIAL PRIMARY KEY,
+      membership_id INTEGER NOT NULL REFERENCES memberships(id),
+      redemption_type TEXT NOT NULL,
+      booking_id INTEGER,
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_membership_redemptions_membership ON membership_redemptions (membership_id);
+  `);
+  membershipTablesReady = true;
 }
 
 // Adds one billing/complimentary cycle to a YYYY-MM-DD date string.
@@ -28,15 +91,26 @@ function addCycle(dateStr, cycle) {
   return d.toISOString().slice(0, 10);
 }
 
+// Resources that touch the membership tables - ensure they exist first.
+const MEMBERSHIP_RESOURCES = new Set([
+  'plans', 'plan-detail', 'plan', 'members', 'member-detail', 'member',
+  'redeem-slot', 'public-plans', 'signup'
+]);
+
 export default async function handler(req, res) {
   const resource = req.query.resource;
 
   try {
+    if (MEMBERSHIP_RESOURCES.has(resource)) await ensureMembershipTables();
+
     if (req.method === 'GET') {
       if (resource === 'plans') return handleListPlans(req, res);
       if (resource === 'plan-detail') return handlePlanDetail(req, res);
       if (resource === 'members') return handleListMembers(req, res);
       if (resource === 'member-detail') return handleMemberDetail(req, res);
+      // Public, unauthenticated: only what the register subdomain needs to
+      // show customers the plans staff have marked active.
+      if (resource === 'public-plans') return handleListPublicPlans(req, res);
       return handleListCustomers(req, res);
     }
 
@@ -44,6 +118,9 @@ export default async function handler(req, res) {
       if (resource === 'plan') return handleCreatePlan(req, res);
       if (resource === 'member') return handleCreateMember(req, res);
       if (resource === 'redeem-slot') return handleRedeemSlot(req, res);
+      // Public, unauthenticated: a customer requesting a plan from
+      // register.playboxkashmir.com. Lands as 'pending' for staff review.
+      if (resource === 'signup') return handleSignup(req, res);
       res.setHeader('Allow', 'GET');
       return res.status(405).json({ error: 'Unknown resource for POST.' });
     }
@@ -231,6 +308,73 @@ async function handleDeletePlan(req, res) {
   const result = await query('DELETE FROM membership_plans WHERE id = $1 RETURNING id', [id]);
   if (!result.rows.length) return res.status(404).json({ error: 'Plan not found.' });
   return res.status(200).json({ success: true });
+}
+
+// Only what a customer on register.playboxkashmir.com needs to compare and
+// choose a plan - no auth, so keep this to non-sensitive, customer-facing fields.
+async function handleListPublicPlans(req, res) {
+  const { rows } = await query(
+    `SELECT id, name, description, price, billing_cycle, discount_type, discount_value,
+            discount_max_amount, complimentary_slots, complimentary_frequency,
+            allow_reserve_without_payment, priority_booking, applicable_sports
+     FROM membership_plans
+     WHERE is_active = true
+     ORDER BY price ASC`
+  );
+  return res.status(200).json({ plans: rows });
+}
+
+// Public sign-up from register.playboxkashmir.com. Creates the membership as
+// 'pending' with no payment recorded - staff confirm payment and flip it to
+// 'active' from the admin Memberships page, the same way a walk-in enrollment
+// is handled, just started by the customer instead of a staff member.
+async function handleSignup(req, res) {
+  const body = parseBody(req);
+  const { plan_id, member_name, member_email, member_phone, notes } = body;
+
+  if (!plan_id || !member_name || !member_email || !member_phone) {
+    return res.status(400).json({ error: 'plan_id, member_name, member_email and member_phone are required.' });
+  }
+  const emailStr = String(member_email).trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr)) {
+    return res.status(400).json({ error: 'A valid email address is required.' });
+  }
+  const phoneStr = String(member_phone).trim();
+  if (phoneStr.replace(/\D/g, '').length < 7) {
+    return res.status(400).json({ error: 'A valid phone number is required.' });
+  }
+
+  const planRes = await query('SELECT * FROM membership_plans WHERE id = $1 AND is_active = true', [Number(plan_id)]);
+  if (!planRes.rows.length) return res.status(404).json({ error: 'Membership plan not found or no longer available.' });
+  const plan = planRes.rows[0];
+
+  const startDate = new Date().toISOString().slice(0, 10);
+  const endDate = addCycle(startDate, plan.billing_cycle);
+  const resetAt = addCycle(startDate, plan.complimentary_frequency);
+
+  const insertRes = await query(
+    `INSERT INTO memberships
+      (plan_id, member_name, member_email, member_phone, start_date, end_date,
+       complimentary_slots_total, complimentary_slots_remaining, complimentary_slots_reset_at,
+       amount_paid, payment_method, notes, status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending')
+     RETURNING *`,
+    [
+      plan.id, String(member_name).trim(), emailStr, phoneStr,
+      startDate, endDate, plan.complimentary_slots, plan.complimentary_slots, resetAt,
+      0, 'pending', notes ? String(notes).trim().slice(0, 1000) : null
+    ]
+  );
+  const membership = insertRes.rows[0];
+
+  // Best-effort: a failed confirmation email should never fail the sign-up itself.
+  try {
+    await sendMembershipSignupEmail(membership, plan);
+  } catch (emailErr) {
+    console.error('Membership sign-up confirmation email failed:', emailErr);
+  }
+
+  return res.status(201).json({ member: membership });
 }
 
 // ---------------- Members (plan enrollments) ----------------
