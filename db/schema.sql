@@ -160,3 +160,61 @@ CREATE TABLE IF NOT EXISTS tournament_matches (
   );
 
 CREATE INDEX IF NOT EXISTS idx_tournament_matches_tournament ON tournament_matches (tournament_id);
+
+
+-- ============================================================
+-- Memberships module
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS membership_plans (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  price NUMERIC(10,2) NOT NULL DEFAULT 0,
+  billing_cycle TEXT NOT NULL DEFAULT 'monthly',
+  discount_type TEXT NOT NULL DEFAULT 'none',
+  discount_value NUMERIC(10,2) NOT NULL DEFAULT 0,
+  discount_max_amount NUMERIC(10,2),
+  complimentary_slots INTEGER NOT NULL DEFAULT 0,
+  complimentary_frequency TEXT NOT NULL DEFAULT 'monthly',
+  allow_reserve_without_payment BOOLEAN NOT NULL DEFAULT false,
+  priority_booking BOOLEAN NOT NULL DEFAULT false,
+  max_advance_booking_days INTEGER,
+  applicable_sports JSONB NOT NULL DEFAULT '[]'::jsonb,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ
+  );
+
+CREATE TABLE IF NOT EXISTS memberships (
+  id SERIAL PRIMARY KEY,
+  plan_id INTEGER NOT NULL REFERENCES membership_plans(id),
+  member_name TEXT NOT NULL,
+  member_email TEXT NOT NULL,
+  member_phone TEXT NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  complimentary_slots_total INTEGER NOT NULL DEFAULT 0,
+  complimentary_slots_remaining INTEGER NOT NULL DEFAULT 0,
+  complimentary_slots_reset_at DATE,
+  amount_paid NUMERIC(10,2) NOT NULL DEFAULT 0,
+  payment_method TEXT NOT NULL DEFAULT 'cash',
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ
+  );
+
+CREATE INDEX IF NOT EXISTS idx_memberships_plan ON memberships (plan_id);
+CREATE INDEX IF NOT EXISTS idx_memberships_email ON memberships (member_email);
+
+CREATE TABLE IF NOT EXISTS membership_redemptions (
+  id SERIAL PRIMARY KEY,
+  membership_id INTEGER NOT NULL REFERENCES memberships(id),
+  redemption_type TEXT NOT NULL,
+  booking_id INTEGER,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+
+CREATE INDEX IF NOT EXISTS idx_membership_redemptions_membership ON membership_redemptions (membership_id);
