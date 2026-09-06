@@ -67,6 +67,15 @@ body.register-page { background: #f9fafb; min-height: 100vh; }
 .agree-terms input { margin-top: 3px; width: 18px; height: 18px; flex: 0 0 auto; cursor: pointer; accent-color: #15803d; }
 .agree-terms a { color: #15803d; text-decoration: underline; }
 
+/* Membership plan cards (register/membership.html) reuse .tourn-card /
+   .tourn-cards for the grid + hover treatment and just add the perks list
+   and a couple of membership-only tweaks below. */
+.plan-card { cursor: pointer; }
+.plan-perks { list-style: none; margin: 0.75rem 0 0.25rem; padding: 0; }
+.plan-perks li { font-size: 0.85rem; color: #374151; margin-bottom: 0.4rem; display: flex; align-items: flex-start; gap: 0.5rem; }
+.plan-perks li i { color: #15803d; margin-top: 0.2rem; font-size: 0.75rem; }
+.mem-fine-print { margin-top: 0.85rem; font-size: 0.8rem; color: #9ca3af; text-align: center; }
+
 /* Mobile: the two-column form grid main.html's booking form already
    collapses at 768px (see .form-grid in booking.css) had no equivalent
    here, so team/captain and contact/email fields were squeezed into
