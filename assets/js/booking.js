@@ -46,6 +46,9 @@ function toLocalDateKey(date) { if (!date) return ''; var y = date.getFullYear()
          promoValue: 0,
          promoMinAmount: 0,
          promoDiscount: 0,
+         membershipInfo: null,
+         useComplimentarySlot: false,
+         membershipDiscount: 0,
          basePrice: 0,
          gstAmount: 0,
          totalAmount: 0,
@@ -335,14 +338,14 @@ function renderSummaryStep3() {
 }
 
 function buildSummaryRows() {
-const rows = []; rows.push(['Sport', state.sportName]); rows.push(['Facility', state.facilityName]); rows.push(['Date', state.dateFormatted]); rows.push(['Time Slot', state.slotLabel]); rows.push(['Turf Price', '₹' + state.basePrice]); if (state.inauguralDiscount > 0) { rows.push(['Inaugural Offer (-' + CONFIG.inaugural_discount_pct + '%)', '-₹' + state.inauguralDiscount]); } if (state.promoDiscount > 0) { rows.push(['Promo (' + state.promoCode + ')', '-₹' + state.promoDiscount]); } rows.push(['Subtotal', '₹' + state.discountedSubtotal]);
+const rows = []; rows.push(['Sport', state.sportName]); rows.push(['Facility', state.facilityName]); rows.push(['Date', state.dateFormatted]); rows.push(['Time Slot', state.slotLabel]); rows.push(['Turf Price', '₹' + state.basePrice]); if (state.inauguralDiscount > 0) { rows.push(['Inaugural Offer (-' + CONFIG.inaugural_discount_pct + '%)', '-₹' + state.inauguralDiscount]); } if (state.membershipDiscount > 0) { rows.push(['Membership Discount' + (state.membershipInfo && state.membershipInfo.plan_name ? ' (' + state.membershipInfo.plan_name + ')' : ''), '-₹' + state.membershipDiscount]); } if (state.promoDiscount > 0) { rows.push(['Promo (' + state.promoCode + ')', '-₹' + state.promoDiscount]); } rows.push(['Subtotal', '₹' + state.discountedSubtotal]);
    return rows.map(function (r) {
       return '<div class="summary-row"><span class="label">' + r[0] + '</span><span class="value">' + r[1] + '</span></div>';
    }).join('');
 }
 function buildBookingInfoRows() { const rows = []; rows.push(['Sport', state.sportName]); rows.push(['Facility', state.facilityName]); rows.push(['Date', state.dateFormatted]); rows.push(['Time Slot', state.slotLabel]); return rows.map(function (r) { return '<div class="summary-row"><span class="label">' + r[0] + '</span><span class="value">' + r[1] + '</span></div>'; }).join(''); }
 
-function calculatePrice() { const original = state.basePrice; const inauguralDiscount = Math.round(original * CONFIG.inaugural_discount_pct / 100); state.inauguralDiscount = inauguralDiscount; const afterInaugural = original - inauguralDiscount; let price = afterInaugural; let discount = 0; if (state.promoCode && price >= state.promoMinAmount) { if (state.promoType === 'percent') { discount = Math.round(price * state.promoValue / 100); } else { discount = state.promoValue; } } state.promoDiscount = discount; const discounted = price - discount; state.discountedSubtotal = discounted; const convenienceFee = CONFIG.convenience_fee; state.gstAmount = convenienceFee; state.totalAmount = Math.round((discounted + convenienceFee) * 100) / 100; }
+function calculatePrice() { const original = state.basePrice; const inauguralDiscount = Math.round(original * CONFIG.inaugural_discount_pct / 100); state.inauguralDiscount = inauguralDiscount; const afterInaugural = original - inauguralDiscount; let price = afterInaugural; let membershipDiscount = 0; var minfo = state.membershipInfo; if (minfo && Number(minfo.discount_value) > 0) { var dv = Number(minfo.discount_value); if (minfo.discount_type === 'percent') { membershipDiscount = Math.round(price * dv / 100); var cap = Number(minfo.discount_max_amount); if (!isNaN(cap) && cap > 0) { membershipDiscount = Math.min(membershipDiscount, cap); } } else if (minfo.discount_type === 'flat') { membershipDiscount = Math.min(dv, price); } } state.membershipDiscount = membershipDiscount; price = price - membershipDiscount; let discount = 0; if (state.promoCode && price >= state.promoMinAmount) { if (state.promoType === 'percent') { discount = Math.round(price * state.promoValue / 100); } else { discount = state.promoValue; } } state.promoDiscount = discount; const discounted = price - discount; state.discountedSubtotal = discounted; const convenienceFee = CONFIG.convenience_fee; state.gstAmount = convenienceFee; state.totalAmount = Math.round((discounted + convenienceFee) * 100) / 100; }
 async function applyPromo() {
    const codeInput = document.getElementById('promoCode');
    const resultEl = document.getElementById('promoResult');
@@ -415,32 +418,84 @@ function validateAndProceed() {
    if (!valid) return;
    state.customerName = name;
    state.customerPhone = phone;
-   state.customerEmail = email; lookupReturningCustomer(email);
+   state.customerEmail = email; lookupReturningCustomer(email); lookupMembership(email);
    const notesEl = document.getElementById('custNotes');
    state.customerNotes = notesEl ? notesEl.value.trim() : '';
    calculatePrice();
    goToStep(4);
 }
 
-function lookupReturningCustomer(email) { if (!email) return; fetch('/api/bookings?resource=customer-lookup&email=' + encodeURIComponent(email)).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) { state.welcomeBackFound = !!(data && data.found); state.welcomeBackName = null; var el = document.getElementById('welcomeBackMsg'); if (el) { if (state.welcomeBackFound) { el.textContent = 'Welcome back!'; el.style.display = 'flex'; } else { el.style.display = 'none'; } } }).catch(function () {}); } function renderPaymentStep() {
-   calculatePrice();
-   const finalSummary = document.getElementById('finalSummary'); var welcomeEl = document.getElementById('welcomeBackMsg'); if (welcomeEl) { if (state.welcomeBackFound) { welcomeEl.textContent = 'Welcome back!'; welcomeEl.style.display = 'flex'; } else { welcomeEl.style.display = 'none'; } }
-   if (finalSummary) {
-      finalSummary.innerHTML = buildBookingInfoRows() +
-         '<div class="summary-row"><span class="label">Customer</span><span class="value">' + state.customerName + '</span></div>' +
-         '<div class="summary-row"><span class="label">Email</span><span class="value">' + state.customerEmail + '</span></div>';
+function lookupReturningCustomer(email) { if (!email) return; fetch('/api/bookings?resource=customer-lookup&email=' + encodeURIComponent(email)).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) { state.welcomeBackFound = !!(data && data.found); state.welcomeBackName = null; var el = document.getElementById('welcomeBackMsg'); if (el) { if (state.welcomeBackFound) { el.textContent = 'Welcome back!'; el.style.display = 'flex'; } else { el.style.display = 'none'; } } }).catch(function () {}); }
+
+function lookupMembership(email) {
+   if (!email || !state.sport) { state.membershipInfo = null; state.useComplimentarySlot = false; refreshMembershipUI(); return; }
+   fetch('/api/bookings?resource=membership-status&email=' + encodeURIComponent(email) + '&sport=' + encodeURIComponent(state.sport))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+         state.membershipInfo = (data && data.found) ? data : null;
+         if (!state.membershipInfo) state.useComplimentarySlot = false;
+         refreshMembershipUI();
+      })
+      .catch(function () { state.membershipInfo = null; state.useComplimentarySlot = false; refreshMembershipUI(); });
+}
+
+function refreshMembershipUI() {
+   var box = document.getElementById('complimentarySlotBox');
+   var checkbox = document.getElementById('complimentaryCheckbox');
+   var label = document.getElementById('complimentaryLabel');
+   var info = state.membershipInfo;
+   var hoursSelected = (state.selectedHours || []).length;
+
+   if (!info || !(Number(info.complimentary_total) > 0)) {
+      if (box) box.style.display = 'none';
+      state.useComplimentarySlot = false;
+   } else {
+      var remaining = Number(info.complimentary_remaining) || 0;
+      var total = Number(info.complimentary_total) || 0;
+      var enough = hoursSelected > 0 && remaining >= hoursSelected;
+      if (box) box.style.display = 'flex';
+      if (checkbox) {
+         checkbox.checked = !!state.useComplimentarySlot && enough;
+         checkbox.disabled = !enough;
+         if (!enough) { state.useComplimentarySlot = false; }
+      }
+      if (label) {
+         label.innerHTML = 'Use complimentary slot for this booking <strong>(' + remaining + '/' + total + ' remaining)</strong>' +
+            (enough ? '' : ' <span style="color:#ef4444;font-weight:600;">- not enough remaining for ' + hoursSelected + ' hour' + (hoursSelected === 1 ? '' : 's') + '</span>');
+      }
    }
+   if (state.step === 4) {
+      refreshPriceBreakdownUI();
+      updateComplimentaryModeUI();
+   }
+}
+
+function toggleComplimentarySlot(checked) {
+   state.useComplimentarySlot = !!checked;
+   refreshPriceBreakdownUI();
+   updateComplimentaryModeUI();
+}
+
+function refreshPriceBreakdownUI() {
+   calculatePrice();
    const slotPriceEl = document.getElementById('pay-slot-price');
    if (slotPriceEl) slotPriceEl.textContent = '₹' + state.basePrice;
    const inaugRow = document.getElementById('inauguralRow'); if (inaugRow) { if (state.inauguralDiscount > 0) { inaugRow.style.display = 'flex'; const payInaugEl = document.getElementById('pay-inaugural'); if (payInaugEl) payInaugEl.textContent = '-₹' + state.inauguralDiscount; } else { inaugRow.style.display = 'none'; } }
+   const memRow = document.getElementById('membershipDiscountRow');
+   if (memRow) {
+      if (state.membershipDiscount > 0) {
+         memRow.style.display = 'flex';
+         const payMemEl = document.getElementById('pay-membership-discount');
+         if (payMemEl) payMemEl.textContent = '-₹' + state.membershipDiscount;
+         const memLabelEl = document.getElementById('membershipDiscountLabel');
+         if (memLabelEl) memLabelEl.textContent = 'Membership Discount' + (state.membershipInfo && state.membershipInfo.plan_name ? ' (' + state.membershipInfo.plan_name + ')' : '');
+      } else {
+         memRow.style.display = 'none';
+      }
+   }
    const gstEl = document.getElementById('pay-gst');
    if (gstEl) gstEl.textContent = '₹' + state.gstAmount;
-   state.paymentMode = 'full';
-        var modeFullBtn = document.getElementById('modeFullBtn'); var modeReserveBtn = document.getElementById('modeReserveBtn');
-        if (modeFullBtn) modeFullBtn.classList.add('active');
-        if (modeReserveBtn) modeReserveBtn.classList.remove('active');
-        updatePaymentModeUI();
-     const discRow = document.getElementById('discountRow');
+   const discRow = document.getElementById('discountRow');
    if (discRow) {
       if (state.promoDiscount > 0) {
          discRow.style.display = 'flex';
@@ -450,9 +505,41 @@ function lookupReturningCustomer(email) { if (!email) return; fetch('/api/bookin
          discRow.style.display = 'none';
       }
    }
+   updatePaymentModeUI();
+}
+
+function updateComplimentaryModeUI() {
+   var free = !!state.useComplimentarySlot;
+   var priceBreakdown = document.querySelector('#step-4 .price-breakdown');
+   var modeToggle = document.getElementById('paymentModeToggle');
+   var freeNote = document.getElementById('complimentaryFreeNote');
+   var normalText = document.getElementById('btnPayNormalText');
+   var freeText = document.getElementById('btnPayFreeText');
+   var reserveNote = document.getElementById('reserveHelperNote');
+
+   if (priceBreakdown) priceBreakdown.style.display = free ? 'none' : '';
+   if (modeToggle) modeToggle.style.display = free ? 'none' : '';
+   if (freeNote) freeNote.style.display = free ? 'flex' : 'none';
+   if (normalText) normalText.style.display = free ? 'none' : '';
+   if (freeText) freeText.style.display = free ? '' : 'none';
+   if (free && reserveNote) reserveNote.style.display = 'none';
+}
+
+function renderPaymentStep() {
+   const finalSummary = document.getElementById('finalSummary'); var welcomeEl = document.getElementById('welcomeBackMsg'); if (welcomeEl) { if (state.welcomeBackFound) { welcomeEl.textContent = 'Welcome back!'; welcomeEl.style.display = 'flex'; } else { welcomeEl.style.display = 'none'; } }
+   if (finalSummary) {
+      finalSummary.innerHTML = buildBookingInfoRows() +
+         '<div class="summary-row"><span class="label">Customer</span><span class="value">' + state.customerName + '</span></div>' +
+         '<div class="summary-row"><span class="label">Email</span><span class="value">' + state.customerEmail + '</span></div>';
+   }
+   state.paymentMode = 'full';
+        var modeFullBtn = document.getElementById('modeFullBtn'); var modeReserveBtn = document.getElementById('modeReserveBtn');
+        if (modeFullBtn) modeFullBtn.classList.add('active');
+        if (modeReserveBtn) modeReserveBtn.classList.remove('active');
+   refreshMembershipUI();
        const upsellEl = document.getElementById('peakUpsellBanner');
        if (upsellEl) {
-                
+
                 const isPeakSlot = (state.selectedHours || []).some(function (h) { return CONFIG.peak_hours.indexOf(h % 24) !== -1; });
 upsellEl.style.display = (isPeakSlot && (state.selectedHours || []).length === 1) ? 'flex' : 'none';       }
    startReservationTimer();
@@ -544,6 +631,10 @@ var agreeBox = document.getElementById('agree-terms');
       if (agreeBox.scrollIntoView) agreeBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
    }
+   if (state.useComplimentarySlot) {
+      submitComplimentaryBooking();
+      return;
+   }
    showLoading('Initializing payment...');
 state.bookingId = 'PBK' + Date.now().toString(36).toUpperCase();
 createRazorpayOrder().then(function () {
@@ -600,6 +691,43 @@ function createRazorpayOrder() {
       if (!data || !data.id) throw new Error('Invalid order response from server.');
       state.razorpayOrderId = data.id; if (typeof data.amount === 'number') { state.totalAmount = data.amount / 100; var totalEl = document.getElementById('pay-total'); if (totalEl) totalEl.innerHTML = '<strong>₹' + state.totalAmount + '</strong>'; var payBtnAmount = document.getElementById('btnPayAmount'); if (payBtnAmount) payBtnAmount.textContent = '₹' + state.totalAmount; } state.isReserve = !!data.is_reserve; state.fullAmount = (typeof data.full_amount === 'number') ? data.full_amount : state.totalAmount; state.reserveAmount = (typeof data.reserve_amount === 'number') ? data.reserve_amount : 0; state.balanceDue = (typeof data.balance_due === 'number') ? data.balance_due : 0;
       return data;
+   });
+}
+
+function submitComplimentaryBooking() {
+   showLoading('Confirming your complimentary booking...');
+   state.bookingId = 'PBK' + Date.now().toString(36).toUpperCase();
+   var hrsArr = (state.selectedHours || []).slice();
+   fetch('/api/bookings?resource=complimentary-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+         facility_id: state.facilityId,
+         booking_date: state.date ? toLocalDateKey(state.date) : '',
+         hours: hrsArr,
+         customer_name: state.customerName,
+         customer_email: state.customerEmail,
+         customer_phone: state.customerPhone,
+         customer_notes: state.customerNotes,
+         terms_accepted: true
+      })
+   }).then(function (res) {
+      return res.json().then(function (data) { return { res: res, data: data }; });
+   }).then(function (result) {
+      hideLoading();
+      if (!result.res.ok || !result.data || !result.data.booking) {
+         var msg = (result.data && result.data.error) || 'Could not complete your complimentary booking. Please try again.';
+         alert(msg);
+         return;
+      }
+      state.totalAmount = 0;
+      state.isReserve = false;
+      state.balanceDue = 0;
+      stopReservationTimer();
+      showConfirmation({ razorpay_payment_id: '' });
+   }).catch(function () {
+      hideLoading();
+      alert('Network error while completing your complimentary booking. Please try again.');
    });
 }
 
@@ -685,6 +813,12 @@ if (window.pbkTrackBookingComplete) { try { window.pbkTrackBookingComplete(); } 
 });
    const confirmCard = document.getElementById('confirmCard');
    if (confirmCard) {
+      var isComp = !!state.useComplimentarySlot;
+      var amountRow = isComp
+         ? '<div class="summary-row"><span class="label">Amount Paid</span><span class="value" style="color:#15803d;font-weight:800;">FREE (Complimentary Slot)</span></div>'
+         : '<div class="summary-row"><span class="label">Amount Paid</span><span class="value" style="color:#15803d;font-weight:800;">₹' + state.totalAmount + '</span></div>';
+      var statusText = isComp ? 'Confirmed (Complimentary Slot)' : (state.isReserve ? 'Reserved - Pending Full Payment' : 'Confirmed');
+      var statusColor = isComp ? '#15803d' : (state.isReserve ? '#b45309' : '#10b981');
       confirmCard.innerHTML =
          '<div class="summary-row"><span class="label">Booking ID</span><span class="value" style="font-family:monospace;">' + state.bookingId + '</span></div>' +
          '<div class="summary-row"><span class="label">Sport</span><span class="value">' + state.sportName + '</span></div>' +
@@ -693,10 +827,10 @@ if (window.pbkTrackBookingComplete) { try { window.pbkTrackBookingComplete(); } 
          '<div class="summary-row"><span class="label">Time Slot</span><span class="value">' + state.slotLabel + '</span></div>' +
          '<div class="summary-row"><span class="label">Customer</span><span class="value">' + state.customerName + '</span></div>' +
          '<div class="summary-row"><span class="label">Email</span><span class="value">' + state.customerEmail + '</span></div>' +
-         '<div class="summary-row"><span class="label">Amount Paid</span><span class="value" style="color:#15803d;font-weight:800;">₹' + state.totalAmount + '</span></div>' +
-         (state.isReserve ? '<div class="summary-row"><span class="label">Balance Due</span><span class="value" style="color:#b45309;font-weight:700;">₹' + state.balanceDue + '</span></div>' : '') +
-         '<div class="summary-row"><span class="label">Payment ID</span><span class="value" style="font-family:monospace;">' + (paymentResponse.razorpay_payment_id || '') + '</span></div>' +
-         '<div class="summary-row"><span class="label">Status</span><span class="value" style="color:' + (state.isReserve ? '#b45309' : '#10b981') + ';">' + (state.isReserve ? 'Reserved - Pending Full Payment' : 'Confirmed') + '</span></div>';
+         amountRow +
+         (state.isReserve && !isComp ? '<div class="summary-row"><span class="label">Balance Due</span><span class="value" style="color:#b45309;font-weight:700;">₹' + state.balanceDue + '</span></div>' : '') +
+         (isComp ? '' : '<div class="summary-row"><span class="label">Payment ID</span><span class="value" style="font-family:monospace;">' + (paymentResponse.razorpay_payment_id || '') + '</span></div>') +
+         '<div class="summary-row"><span class="label">Status</span><span class="value" style="color:' + statusColor + ';">' + statusText + '</span></div>';
    }
    goToStep(5);
 }
@@ -733,6 +867,9 @@ function resetBooking() {
       promoValue: 0,
       promoMinAmount: 0,
       promoDiscount: 0,
+      membershipInfo: null,
+      useComplimentarySlot: false,
+      membershipDiscount: 0,
       basePrice: 0,
       gstAmount: 0,
       totalAmount: 0,
@@ -751,6 +888,10 @@ function resetBooking() {
 });
    const promoResultEl = document.getElementById('promoResult');
    if (promoResultEl) promoResultEl.textContent = '';
+   var compCheckboxEl = document.getElementById('complimentaryCheckbox');
+   if (compCheckboxEl) compCheckboxEl.checked = false;
+   var compBoxEl = document.getElementById('complimentarySlotBox');
+   if (compBoxEl) compBoxEl.style.display = 'none';
    goToStep(1);
 }
 
