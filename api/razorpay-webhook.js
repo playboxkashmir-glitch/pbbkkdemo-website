@@ -7,7 +7,7 @@ import { sendTournamentConfirmationEmail } from '../lib/email.js';
 import { seedTournamentIfFull } from '../lib/tournament.js';
 import crypto from 'crypto';
 import { query } from '../lib/db.js';
-import { sendBookingConfirmationEmail, sendMembershipActivatedEmail } from '../lib/email.js';
+import { sendBookingConfirmationEmail, sendMembershipActivatedEmail, sendMembershipAdminNotificationEmail } from '../lib/email.js';
 
 // Duplicated from api/customers/index.js on purpose: each Vercel serverless
 // function file here is self-contained (see the comment at the top of that
@@ -278,6 +278,7 @@ async function handleMembershipPaymentCaptured(payment) {
     const membership = insertRes.rows[0];
 
     await sendMembershipActivatedEmail(membership, plan);
+    await sendMembershipAdminNotificationEmail(membership, plan);
   } catch (err) {
     console.error('handleMembershipPaymentCaptured error:', err);
   }
