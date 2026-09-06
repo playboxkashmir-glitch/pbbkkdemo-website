@@ -50,7 +50,11 @@
     text.textContent = 'We use cookies and similar technologies to run our website, keep it secure, understand how it is used, and improve your experience. You can accept all cookies or customise your preferences.';
 
     var link = document.createElement('a');
-    link.href = 'privacy.html';
+    // Absolute URL (not a relative "privacy.html") so this banner links to
+    // the same privacy page correctly whether it is running on the main
+    // site or on a subdomain such as register.playboxkashmir.com, which
+    // does not have its own copy of this page.
+    link.href = 'https://www.playboxkashmir.com/privacy.html';
     link.textContent = ' Learn more.';
     link.style.cssText = 'color:#93c5fd;text-decoration:underline;margin-left:4px;';
     text.appendChild(link);
