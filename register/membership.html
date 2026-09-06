@@ -79,19 +79,24 @@
 </div>
 </div>
 
+<div class="agree-terms" id="agreeTermsBox">
+<input type="checkbox" id="mem_agree_terms">
+<label for="mem_agree_terms">I accept the <a href="membership-terms.html" target="_blank">Membership Terms and Conditions</a> <span class="req">*</span></label>
+</div>
+
 <div class="reg-fee-bar">
 <div>Plan Price<br><span class="fee-amount" id="mem_price_display">₹0</span></div>
-<button class="btn-pay-register" id="btnSubmitSignup">Submit Request</button>
+<button class="btn-pay-register" id="btnSubmitSignup" disabled>Pay &amp; Activate</button>
 </div>
-<p class="mem-fine-print">No payment is collected here. Our team will contact you to confirm payment and activate your plan.</p>
+<p class="mem-fine-print">You'll be redirected to our secure Razorpay checkout. Your membership activates immediately once payment is confirmed.</p>
 </div>
 </div>
 
 <div id="confirmationSection" style="display:none;">
 <div class="confirm-screen">
 <i class="fas fa-check-circle"></i>
-<h2>Request Received!</h2>
-<p>We've emailed you a confirmation. Our team will reach out shortly to complete your membership sign-up.</p>
+<h2>Membership Activated!</h2>
+<p>Payment received - your membership is now active. We've emailed you a confirmation with your plan details.</p>
 <a href="index.html" class="btn-back-home"><i class="fas fa-home"></i> Back to Home</a>
 </div>
 </div>
@@ -105,6 +110,7 @@
 </div>
 </div>
 
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script src="membership.js"></script>
 <script src="../assets/js/main.js"></script>
 </body>

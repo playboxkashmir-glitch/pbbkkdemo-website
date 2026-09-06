@@ -6,7 +6,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const backBtn = document.getElementById('btnBackToPlans');
     if (backBtn) backBtn.addEventListener('click', backToPlans);
     const submitBtn = document.getElementById('btnSubmitSignup');
-    if (submitBtn) submitBtn.addEventListener('click', submitSignup);
+    if (submitBtn) submitBtn.addEventListener('click', submitPayment);
+    const agreeBox = document.getElementById('mem_agree_terms');
+    if (agreeBox) {
+        agreeBox.addEventListener('change', function () {
+            if (submitBtn) submitBtn.disabled = !agreeBox.checked;
+        });
+    }
 });
 
 async function loadPlans() {
@@ -99,8 +105,12 @@ function selectPlan(p) {
     document.getElementById('mem_phone').value = '';
     document.getElementById('mem_email').value = '';
     document.getElementById('mem_notes').value = '';
+    // Pay button stays disabled until the Terms and Conditions checkbox is
+    // checked (see the 'change' listener wired up in DOMContentLoaded).
+    const agreeBox = document.getElementById('mem_agree_terms');
+    if (agreeBox) agreeBox.checked = false;
     const submitBtn = document.getElementById('btnSubmitSignup');
-    if (submitBtn) submitBtn.disabled = false;
+    if (submitBtn) submitBtn.disabled = true;
 }
 
 function backToPlans() {
@@ -121,24 +131,29 @@ function hideLoading() {
     if (overlay) overlay.style.display = 'none';
 }
 
-async function submitSignup() {
+async function submitPayment() {
     if (!selectedPlan) return;
     const name = document.getElementById('mem_name').value.trim();
     const phone = document.getElementById('mem_phone').value.trim();
     const email = document.getElementById('mem_email').value.trim();
     const notes = document.getElementById('mem_notes').value.trim();
+    const agreeTerms = document.getElementById('mem_agree_terms').checked;
 
     if (!name || !phone || !email) {
         alert('Please fill in your name, phone number and email.');
         return;
     }
+    if (!agreeTerms) {
+        alert('Please accept the Membership Terms and Conditions to continue.');
+        return;
+    }
 
     const submitBtn = document.getElementById('btnSubmitSignup');
     submitBtn.disabled = true;
-    showLoading('Submitting your request...');
+    showLoading('Starting payment...');
 
     try {
-        const res = await fetch('/api/customers?resource=signup', {
+        const orderRes = await fetch('/api/customers?resource=membership-order', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -146,22 +161,87 @@ async function submitSignup() {
                 member_name: name,
                 member_phone: phone,
                 member_email: email,
-                notes: notes
+                notes: notes,
+                terms_accepted: agreeTerms
             })
         });
-        const data = await res.json();
+        const orderData = await orderRes.json();
         hideLoading();
-        if (!res.ok) {
+        if (!orderRes.ok || !orderData.id) {
             submitBtn.disabled = false;
-            alert(data.error || 'Could not submit your request. Please try again.');
+            alert(orderData.error || 'Could not start payment. Please try again.');
             return;
         }
-        showConfirmation();
+        openRazorpayCheckout(orderData, name, email, phone);
     } catch (err) {
         hideLoading();
         submitBtn.disabled = false;
         alert('Network error. Please try again.');
     }
+}
+
+function openRazorpayCheckout(order, name, email, phone) {
+    const options = {
+        key: 'rzp_live_T90dB0bfW4qEMO',
+        amount: order.amount,
+        currency: order.currency || 'INR',
+        name: 'PlayBox Kashmir™',
+        description: selectedPlan.name + ' Membership',
+        image: 'https://playboxkashmir.com/assets/images/logo.png',
+        order_id: order.id,
+        prefill: {
+            name: name,
+            email: email,
+            contact: phone
+        },
+        notes: {
+            type: 'membership',
+            plan_id: String(selectedPlan.id)
+        },
+        theme: { color: '#15803d' },
+        handler: function (response) {
+            verifyAndConfirm(response);
+        },
+        modal: {
+            ondismiss: function () {
+                document.getElementById('btnSubmitSignup').disabled = false;
+            }
+        }
+    };
+    try {
+        const rzp = new Razorpay(options);
+        rzp.open();
+    } catch (err) {
+        alert('Unable to open the payment gateway. Please refresh and try again.');
+        document.getElementById('btnSubmitSignup').disabled = false;
+    }
+}
+
+function verifyAndConfirm(response) {
+    showLoading('Verifying payment...');
+    fetch('/api/verify-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature
+        })
+    }).then(function (res) {
+        return res.json().then(function (data) { return { res: res, data: data }; });
+    }).then(function (result) {
+        hideLoading();
+        if (result.res.ok && result.data && result.data.verified) {
+            showConfirmation();
+        } else {
+            alert('Payment could not be verified. If money was deducted, it will be refunded. Please contact support.');
+            document.getElementById('btnSubmitSignup').disabled = false;
+        }
+    }).catch(function () {
+        hideLoading();
+        alert('Payment verification failed due to a network error. Please contact support with your payment ID.');
+        document.getElementById('btnSubmitSignup').disabled = false;
+    });
 }
 
 function showConfirmation() {
