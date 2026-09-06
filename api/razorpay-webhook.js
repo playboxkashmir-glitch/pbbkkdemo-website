@@ -7,7 +7,25 @@ import { sendTournamentConfirmationEmail } from '../lib/email.js';
 import { seedTournamentIfFull } from '../lib/tournament.js';
 import crypto from 'crypto';
 import { query } from '../lib/db.js';
-import { sendBookingConfirmationEmail } from '../lib/email.js';
+import { sendBookingConfirmationEmail, sendMembershipActivatedEmail } from '../lib/email.js';
+
+// Duplicated from api/customers/index.js on purpose: each Vercel serverless
+// function file here is self-contained (see the comment at the top of that
+// file about staying within a single function slot per feature), so shared
+// pure helpers like this one are kept small and copied rather than pulled
+// through an extra shared module.
+function addMembershipCycle(dateStr, cycle) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  switch (cycle) {
+    case 'monthly': d.setUTCMonth(d.getUTCMonth() + 1); break;
+    case 'quarterly': d.setUTCMonth(d.getUTCMonth() + 3); break;
+    case 'half_yearly': d.setUTCMonth(d.getUTCMonth() + 6); break;
+    case 'annual': d.setUTCFullYear(d.getUTCFullYear() + 1); break;
+    case 'one_time': d.setUTCFullYear(d.getUTCFullYear() + 100); break; // effectively no expiry
+    default: d.setUTCMonth(d.getUTCMonth() + 1);
+  }
+  return d.toISOString().slice(0, 10);
+}
 
 export const config = {
   api: {
@@ -89,6 +107,9 @@ async function handlePaymentCaptured(event) {
     const notes = payment.notes || {};
     if (notes.type === 'tournament') {
       return handleTournamentPaymentCaptured(payment);
+    }
+    if (notes.type === 'membership') {
+      return handleMembershipPaymentCaptured(payment);
     }
     const bookingRef = notes.booking_id;
     if (!bookingRef) {
@@ -198,5 +219,66 @@ async function handleTournamentPaymentCaptured(payment) {
     await seedTournamentIfFull(team.tournament_id);
   } catch (err) {
     console.error('handleTournamentPaymentCaptured error:', err);
+  }
+}
+
+// Handles a captured payment for a membership plan sign-up from
+// register.playboxkashmir.com. Unlike bookings/tournaments there is no
+// existing row to update - the membership is created here, straight into
+// 'active', from the customer details Razorpay hands back in payment.notes
+// (which were set by api/customers/index.js when the order was created).
+// This is the single source of truth for activating a paid membership: the
+// browser-side /api/verify-payment call is only for immediate UI feedback.
+async function handleMembershipPaymentCaptured(payment) {
+  try {
+    const notes = payment.notes || {};
+    const planId = notes.plan_id;
+    if (!planId) {
+      console.error('Membership payment.captured event missing plan_id in notes.');
+      return;
+    }
+
+    // Idempotency: Razorpay can and does retry webhook delivery. If this
+    // payment already produced a membership row, don't create a second one.
+    const existing = await query('SELECT id FROM memberships WHERE razorpay_payment_id = $1', [payment.id]);
+    if (existing.rows.length) {
+      console.log('Membership already recorded for payment', payment.id);
+      return;
+    }
+
+    const planRes = await query('SELECT * FROM membership_plans WHERE id = $1', [planId]);
+    if (!planRes.rows.length) {
+      console.error('No membership plan found for id', planId);
+      return;
+    }
+    const plan = planRes.rows[0];
+
+    const amountPaid = payment.amount ? payment.amount / 100 : Number(plan.price) || 0;
+    const startDate = new Date().toISOString().slice(0, 10);
+    const endDate = addMembershipCycle(startDate, plan.billing_cycle);
+    const resetAt = addMembershipCycle(startDate, plan.complimentary_frequency);
+    const termsAccepted = notes.terms_accepted === true || notes.terms_accepted === 'true';
+
+    const insertRes = await query(
+      `INSERT INTO memberships
+        (plan_id, member_name, member_email, member_phone, start_date, end_date,
+         complimentary_slots_total, complimentary_slots_remaining, complimentary_slots_reset_at,
+         amount_paid, payment_method, notes, status,
+         razorpay_order_id, razorpay_payment_id, terms_accepted_at, terms_version)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'razorpay',$11,'active',$12,$13,
+         CASE WHEN $14 THEN now() ELSE NULL END, $15)
+       RETURNING *`,
+      [
+        plan.id, notes.member_name || '', notes.member_email || '', notes.member_phone || '',
+        startDate, endDate, plan.complimentary_slots, plan.complimentary_slots, resetAt,
+        amountPaid, notes.member_notes || null,
+        payment.order_id || null, payment.id, termsAccepted, notes.terms_version || null,
+      ]
+    );
+    const membership = insertRes.rows[0];
+
+    await sendMembershipActivatedEmail(membership, plan);
+  } catch (err) {
+    console.error('handleMembershipPaymentCaptured error:', err);
   }
 }
