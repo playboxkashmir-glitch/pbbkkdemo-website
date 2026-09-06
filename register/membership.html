@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Membership Sign-Up - PlayBox Kashmir™</title>
+<link rel="icon" type="image/png" href="../favicon.png?v=2">
+<link rel="shortcut icon" type="image/png" href="../favicon.png?v=2">
+<link rel="apple-touch-icon" href="../favicon.png?v=2">
+<link rel="canonical" href="https://register.playboxkashmir.com/membership.html">
+<meta name="description" content="Sign up for a PlayBox Kashmir™ membership plan.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Membership Sign-Up - PlayBox Kashmir™">
+<meta property="og:description" content="Sign up for a PlayBox Kashmir™ membership plan.">
+<meta property="og:image" content="https://www.playboxkashmir.com/favicon.png">
+<meta property="og:url" content="https://register.playboxkashmir.com/membership.html">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/register.css">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<link rel="preload" as="style" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"></noscript>
+<noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css"></noscript>
+</head>
+<body class="register-page">
+
+<nav class="navbar" id="navbar">
+<div class="nav-container">
+<a href="index.html" class="nav-logo">
+<span class="logo-play">Play</span><span class="logo-box">Box</span>
+<span class="logo-kashmir">Kashmir</span><span class="logo-tm">™</span>
+</a>
+<div class="nav-actions">
+<a href="index.html" class="btn-back-home">
+<i class="fas fa-arrow-left"></i> Back
+</a>
+</div>
+</div>
+</nav>
+
+<div class="reg-hero">
+<h1>Membership Plans</h1>
+<p>Pick a plan below and our team will get you set up</p>
+</div>
+
+<div class="reg-container">
+
+<div id="planListSection">
+<div class="tourn-cards" id="planCards">
+<p>Loading membership plans...</p>
+</div>
+</div>
+
+<div id="signupFormSection" style="display:none;">
+<div class="reg-form-card">
+<button class="btn-back-step" id="btnBackToPlans"><i class="fas fa-arrow-left"></i> Back to plans</button>
+<h2 id="selectedPlanName"></h2>
+<p class="reg-form-sub" id="selectedPlanSub"></p>
+
+<div id="signupMsg" class="eligibility-msg"></div>
+
+<div class="form-row">
+<div>
+<label>Full Name</label>
+<input type="text" id="mem_name">
+</div>
+<div>
+<label>Phone Number</label>
+<input type="tel" id="mem_phone">
+</div>
+</div>
+<div class="form-row">
+<div>
+<label>Email</label>
+<input type="email" id="mem_email">
+</div>
+<div>
+<label>Notes (optional)</label>
+<input type="text" id="mem_notes" placeholder="Anything we should know?">
+</div>
+</div>
+
+<div class="reg-fee-bar">
+<div>Plan Price<br><span class="fee-amount" id="mem_price_display">₹0</span></div>
+<button class="btn-pay-register" id="btnSubmitSignup">Submit Request</button>
+</div>
+<p class="mem-fine-print">No payment is collected here. Our team will contact you to confirm payment and activate your plan.</p>
+</div>
+</div>
+
+<div id="confirmationSection" style="display:none;">
+<div class="confirm-screen">
+<i class="fas fa-check-circle"></i>
+<h2>Request Received!</h2>
+<p>We've emailed you a confirmation. Our team will reach out shortly to complete your membership sign-up.</p>
+<a href="index.html" class="btn-back-home"><i class="fas fa-home"></i> Back to Home</a>
+</div>
+</div>
+
+</div>
+
+<div class="loading-overlay" id="loadingOverlay" style="display:none;">
+<div style="text-align:center;">
+<i class="fas fa-spinner fa-spin" style="font-size:2rem;color:#15803d;"></i>
+<p id="loadingText" style="margin-top:0.75rem;color:#374151;">Processing...</p>
+</div>
+</div>
+
+<script src="membership.js"></script>
+<script src="../assets/js/main.js"></script>
+</body>
+</html>
