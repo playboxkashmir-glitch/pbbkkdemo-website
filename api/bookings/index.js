@@ -7,6 +7,10 @@
 // /api/bookings                                (GET list, POST create - admin only)
 // /api/bookings?id=123                          (GET/PATCH/DELETE single - admin only)
 // /api/bookings?resource=availability&date=..    (GET availability - PUBLIC)
+// /api/bookings?resource=membership-status&email=..&sport=..  (GET - PUBLIC: looks up
+//    the caller's active membership discount + complimentary slot balance for a sport)
+// /api/bookings?resource=complimentary-booking   (POST - PUBLIC: redeem a complimentary
+//    slot from an active membership for a $0 booking, no payment gateway involved)
 // /api/bookings?resource=send-confirmation       (POST send confirmation email - admin only)
 import { query } from '../../lib/db.js';
 import { requireAuth } from '../../lib/auth.js';
@@ -27,6 +31,13 @@ if (resource === 'availability') {
   return handleAvailability(req, res); } if (resource === 'customer-lookup') { return handleCustomerLookup(req, res);
 }
 if (resource === 'hold') { return handleHold(req, res); }
+// Both membership resources below are intentionally public (no requireAuth):
+// membership-status is read-only lookup-by-email used to render the discount/
+// complimentary-slot UI on the public booking page, and complimentary-booking
+// is how that same public page redeems a slot - same trust model as the
+// Razorpay-backed booking flow, which is also public and self-service.
+if (resource === 'membership-status') { return handleMembershipStatus(req, res); }
+if (resource === 'complimentary-booking') { return handleComplimentaryBooking(req, res); }
 
 const user = await requireAuth(req, res);
   if (!user) return;
@@ -230,6 +241,179 @@ async function handleCustomerLookup(req, res) { if (req.method !== 'GET') { res.
   }
 }
 async function handleHold(req, res) { if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Method not allowed' }); } try { const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {}); const { facility_id, booking_date, slots, hold_token } = body; if (!facility_id || !booking_date || !Array.isArray(slots) || slots.length === 0 || slots.length > 12 || !hold_token) { return res.status(400).json({ error: 'facility_id, booking_date, slots[], and hold_token are required.' }); } await query('DELETE FROM slot_holds WHERE expires_at < now()'); const expiresAt = new Date(Date.now() + 10 * 60000); for (const s of slots) { await query('INSERT INTO slot_holds (facility_id, booking_date, start_time, end_time, hold_token, expires_at) VALUES ($1,$2,$3,$4,$5,$6)', [facility_id, booking_date, s.start_time, s.end_time, hold_token, expiresAt]); } return res.status(200).json({ success: true, expires_at: expiresAt }); } catch (err) { console.error('Hold error:', err); return res.status(500).json({ error: 'Server error while creating slot hold.' }); } }
+
+// Looks up the caller's active membership (matched on the email they typed
+// into the booking form, per the Membership Terms requirement that discounts
+// and complimentary slots are tied to the registered email) that covers the
+// given sport, and returns its discount + complimentary-slot balance so the
+// booking page can show "Use a complimentary slot (1/2 remaining)" and
+// auto-apply the plan's discount to the price breakdown. Returns
+// { found: false } rather than an error when there is no matching active
+// membership - that is the normal case for most bookings, not a failure.
+async function handleMembershipStatus(req, res) {
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', 'GET');
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  const ip = getClientIp(req);
+  if (isLookupRateLimited(ip)) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+  const { email, sport } = req.query;
+  if (!email) {
+    return res.status(400).json({ error: 'email query param is required.' });
+  }
+  try {
+    const rows = await query(
+      `SELECT m.id AS membership_id, m.complimentary_slots_total, m.complimentary_slots_remaining,
+              p.name AS plan_name, p.discount_type, p.discount_value, p.discount_max_amount
+       FROM memberships m
+       JOIN membership_plans p ON p.id = m.plan_id
+       WHERE lower(m.member_email) = lower($1)
+         AND m.status = 'active'
+         AND m.end_date >= CURRENT_DATE
+         AND (p.applicable_sports = '[]'::jsonb OR p.applicable_sports @> to_jsonb($2::text))
+       ORDER BY m.created_at DESC
+       LIMIT 1`,
+      [email, sport || '']
+    );
+    if (rows.rows.length === 0) {
+      return res.status(200).json({ found: false });
+    }
+    const m = rows.rows[0];
+    return res.status(200).json({
+      found: true,
+      membership_id: m.membership_id,
+      plan_name: m.plan_name,
+      discount_type: m.discount_type,
+      discount_value: Number(m.discount_value),
+      discount_max_amount: m.discount_max_amount !== null ? Number(m.discount_max_amount) : null,
+      complimentary_total: m.complimentary_slots_total,
+      complimentary_remaining: m.complimentary_slots_remaining
+    });
+  } catch (err) {
+    console.error('Membership status lookup error:', err);
+    return res.status(500).json({ error: 'Server error while looking up membership status.' });
+  }
+}
+
+// Creates a $0 booking by redeeming one complimentary slot per hour booked
+// from the caller's active membership - entirely separate from the Razorpay
+// flow in api/create-order.js + api/razorpay-webhook.js, since there is no
+// payment to collect or verify here. The membership is re-resolved from the
+// submitted email server-side (never trusted from the client) and the slot
+// count is decremented with a single conditional UPDATE so two concurrent
+// requests can't both redeem the same last remaining slot.
+async function handleComplimentaryBooking(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  try {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    const { facility_id, booking_date, hours, customer_name, customer_email, customer_phone } = body;
+    if (!facility_id || !booking_date || !Array.isArray(hours) || hours.length === 0 || hours.length > 12) {
+      return res.status(400).json({ error: 'facility_id, booking_date and a valid hours[] array (1-12 entries) are required.' });
+    }
+    if (!customer_name || !customer_email || !customer_phone) {
+      return res.status(400).json({ error: 'customer_name, customer_email and customer_phone are required.' });
+    }
+    if (body.terms_accepted !== true) {
+      return res.status(400).json({ error: 'You must accept the Terms & Conditions before booking.' });
+    }
+    if (!hours.every(function (h) { return Number.isInteger(h) && h >= 0 && h < 26; })) {
+      return res.status(400).json({ error: 'hours[] must contain valid hour numbers.' });
+    }
+
+    const facRows = await query('SELECT id, base_price, peak_price, sport_key, option_name FROM facilities WHERE option_id = $1 AND is_active = true', [facility_id]);
+    if (facRows.rows.length === 0) {
+      return res.status(400).json({ error: 'Unknown or unavailable facility.' });
+    }
+    const facility = facRows.rows[0];
+
+    const memberRows = await query(
+      `SELECT m.id, m.complimentary_slots_remaining
+       FROM memberships m
+       JOIN membership_plans p ON p.id = m.plan_id
+       WHERE lower(m.member_email) = lower($1)
+         AND m.status = 'active'
+         AND m.end_date >= CURRENT_DATE
+         AND (p.applicable_sports = '[]'::jsonb OR p.applicable_sports @> to_jsonb($2::text))
+       ORDER BY m.created_at DESC
+       LIMIT 1`,
+      [customer_email, facility.sport_key]
+    );
+    if (memberRows.rows.length === 0) {
+      return res.status(400).json({ error: 'No active membership with complimentary slots found for this email and sport.' });
+    }
+    const membership = memberRows.rows[0];
+    const slotsNeeded = hours.length;
+
+    // Atomic, conditional decrement: only succeeds if enough slots are still
+    // remaining at the moment this runs, so a second request racing for the
+    // last slot(s) fails cleanly instead of over-redeeming.
+    const decrementRes = await query(
+      `UPDATE memberships SET complimentary_slots_remaining = complimentary_slots_remaining - $2, updated_at = now()
+       WHERE id = $1 AND complimentary_slots_remaining >= $2
+       RETURNING id`,
+      [membership.id, slotsNeeded]
+    );
+    if (decrementRes.rows.length === 0) {
+      return res.status(400).json({ error: 'Not enough complimentary slots remaining for this many hours.' });
+    }
+
+    let basePriceTotal = 0;
+    const sortedHours = hours.slice().sort(function (a, b) { return a - b; });
+    sortedHours.forEach(function (h) {
+      basePriceTotal += Number(facility.base_price);
+    });
+    const startTime = (sortedHours[0] % 24) + ':00';
+    const endTime = ((sortedHours[sortedHours.length - 1] + 1) % 24) + ':00';
+    const bookingRef = generateBookingRef();
+    const phoneDigits = String(customer_phone).replace(/\D/g, '');
+
+    let booking;
+    try {
+      const insertRes = await query(
+        `INSERT INTO bookings
+          (booking_ref, facility_id, customer_name, customer_email, customer_phone,
+           booking_date, start_time, end_time, rate, amount, amount_paid, payment_method, payment_status, status, source, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,0,0,'complimentary','paid','confirmed','online',$10)
+         RETURNING *`,
+        [bookingRef, facility.id, customer_name, customer_email, phoneDigits, booking_date, startTime, endTime, basePriceTotal,
+         (body.customer_notes ? body.customer_notes + ' | ' : '') + 'Redeemed via membership #' + membership.id + ' (complimentary slot)']
+      );
+      booking = insertRes.rows[0];
+    } catch (insertErr) {
+      // Roll back the slot decrement if the booking itself could not be
+      // created (e.g. the slot was taken by someone else in the meantime),
+      // so the member doesn't lose a complimentary slot for nothing.
+      await query('UPDATE memberships SET complimentary_slots_remaining = complimentary_slots_remaining + $2, updated_at = now() WHERE id = $1', [membership.id, slotsNeeded]);
+      if (insertErr && insertErr.code === '23505') {
+        return res.status(409).json({ error: 'That date and time slot is already booked for this facility.' });
+      }
+      throw insertErr;
+    }
+
+    await query(
+      'INSERT INTO membership_redemptions (membership_id, redemption_type, booking_id, notes) VALUES ($1,$2,$3,$4)',
+      [membership.id, 'complimentary_slot', booking.id, slotsNeeded + ' hour(s) at ' + facility.option_name + ' on ' + booking_date]
+    );
+
+    booking.option_name = facility.option_name;
+    try {
+      await sendBookingConfirmationEmail(booking);
+      await query('UPDATE bookings SET confirmation_sent_at = now() WHERE id = $1', [booking.id]);
+    } catch (emailErr) {
+      console.error('Complimentary booking confirmation email error:', emailErr);
+    }
+
+    return res.status(201).json({ booking });
+  } catch (err) {
+    console.error('Complimentary booking error:', err);
+    return res.status(500).json({ error: 'Server error while creating complimentary booking.' });
+  }
+}
 
 async function handleSendConfirmation(req, res) {
   if (req.method !== 'POST') {
