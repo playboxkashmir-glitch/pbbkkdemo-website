@@ -282,7 +282,7 @@ async function loadMembers() {
 }
 
 function renderMemberRow(m) {
-  const statusColors = { active: '#059669', expired: '#9ca3af', cancelled: '#dc2626' };
+  const statusColors = { pending: '#d97706', active: '#059669', expired: '#9ca3af', cancelled: '#dc2626' };
   const statusColor = statusColors[m.status] || '#111827';
   const comp = m.complimentary_slots_total > 0
     ? (m.complimentary_slots_remaining + ' / ' + m.complimentary_slots_total + ' left')
