@@ -9,8 +9,8 @@ let pendingSportSelection = null;
 const CONFIG = {
    facilities: {},
        slots: {
-                start: 5,
-                end: 26,
+                start: 6,
+                end: 24,
                 duration: 60
        },
        peak_hours: [18, 19, 20, 21],
@@ -19,7 +19,8 @@ const CONFIG = {
        convenience_fee: 7,
        inaugural_discount_pct: 15,
        reserve_amount: 500,
-       reservation_minutes: 10
+       reservation_minutes: 10,
+       max_advance_days: 30
 };
 
 function toLocalDateKey(date) { if (!date) return ''; var y = date.getFullYear(); var m = String(date.getMonth() + 1).padStart(2, '0'); var d = String(date.getDate()).padStart(2, '0'); return y + '-' + m + '-' + d; }
@@ -217,6 +218,8 @@ function renderCalendar() {
    const daysInMonth = new Date(year, month + 1, 0).getDate();
    const today = new Date();
    today.setHours(0, 0, 0, 0);
+   const maxDate = new Date(today);
+   maxDate.setDate(maxDate.getDate() + CONFIG.max_advance_days);
    let html = '';
    for (let i = 0; i < firstDay; i++) {
       html += '<div class="cal-day empty"></div>';
@@ -226,12 +229,13 @@ function renderCalendar() {
       date.setHours(0, 0, 0, 0);
       const isToday = date.getTime() === today.getTime();
       const isPast = date < today;
+      const isTooFar = date > maxDate;
       const isSelected = state.date && state.date.getTime() === date.getTime();
       let classes = 'cal-day';
       if (isToday) classes += ' today';
-      if (isPast) classes += ' disabled';
+      if (isPast || isTooFar) classes += ' disabled';
       if (isSelected) classes += ' selected';
-      if (isPast) {
+      if (isPast || isTooFar) {
          html += '<div class="' + classes + '">' + d + '</div>';
       } else {
          html += '<div class="' + classes + '" onclick="selectDate(' + year + ',' + month + ',' + d + ')">' + d + '</div>';
