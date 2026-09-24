@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calendar View – PlayBox Kashmir Admin</title>
+          <link rel="icon" type="image/png" href="../favicon.png">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="admin.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+.pk-empty,.pk-loading{text-align:center;color:#9ca3af;padding:2rem;}
+.pk-cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;}
+.pk-cal-nav h2{font-size:1.1rem;font-weight:700;color:#111827;}
+.pk-cal-nav-btns{display:flex;gap:0.5rem;}
+.pk-cal-nav-btns button{width:36px;height:36px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;cursor:pointer;color:#374151;font-size:0.9rem;}
+.pk-cal-nav-btns button:hover{background:#f3f4f6;}
+.pk-cal-today-btn{padding:0 0.9rem;width:auto;font-weight:600;font-size:0.8rem;}
+.pk-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+.pk-cal-dow{text-align:center;font-size:0.75rem;font-weight:700;color:#6b7280;text-transform:uppercase;padding:0.4rem 0;}
+.pk-cal-cell{min-height:88px;border:1px solid #e5e7eb;border-radius:8px;padding:0.5rem;cursor:pointer;transition:background .15s,border-color .15s;position:relative;}
+.pk-cal-cell:hover{background:#f9fafb;}
+.pk-cal-cell.pk-cal-empty{background:#f9fafb;cursor:default;border-color:transparent;}
+.pk-cal-cell.pk-cal-selected{border-color:#1a56db;box-shadow:0 0 0 1px #1a56db inset;}
+.pk-cal-cell.pk-cal-today .pk-cal-daynum{background:#1a56db;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;}
+.pk-cal-daynum{font-size:0.85rem;font-weight:600;color:#374151;}
+.pk-cal-badge{margin-top:0.4rem;display:inline-block;background:#dbeafe;color:#1a56db;font-size:0.7rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:10px;}
+.pk-cal-badge.pk-cal-badge-empty{background:#fee2e2;color:#dc2626;}
+#calSelectedLabel{font-weight:700;color:#111827;}
+</style>
+</head>
+<body class="admin-body">
+
+<aside class="admin-sidebar" id="adminSidebar">
+<div class="sidebar-brand">
+<span class="logo-play">Play</span><span class="logo-box">Box</span>
+<span style="color:#f59e0b;font-size:0.75rem;font-weight:700;margin-left:4px;">ADMIN</span>
+</div>
+<nav class="sidebar-nav">
+<a href="dashboard.html" class="sidebar-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+<a href="bookings.html" class="sidebar-link"><i class="fas fa-calendar-check"></i> Bookings</a>
+<a href="cancel-bookings.html" class="sidebar-link"><i class="fas fa-ban"></i> Cancel Booking</a>
+<a href="calendar.html" class="sidebar-link active"><i class="fas fa-calendar-alt"></i> Calendar View</a>
+<a href="customers.html" class="sidebar-link"><i class="fas fa-users"></i> Customers</a>
+<a href="facilities.html" class="sidebar-link"><i class="fas fa-building"></i> Facilities</a>
+<a href="pricing.html" class="sidebar-link"><i class="fas fa-tags"></i> Pricing</a>
+<a href="promos.html" class="sidebar-link"><i class="fas fa-percentage"></i> Promo Codes</a>
+<a href="reports.html" class="sidebar-link"><i class="fas fa-chart-bar"></i> Reports</a>
+<a href="settings.html" class="sidebar-link"><i class="fas fa-cog"></i> Settings</a>
+          <a href="tournaments.html" class="sidebar-link"><i class="fas fa-trophy"></i> Tournament</a>
+          <a href="memberships.html" class="sidebar-link"><i class="fas fa-id-card"></i> Memberships</a>
+<div class="sidebar-divider"></div>
+<a href="https://www.playboxkashmir.com/" class="sidebar-link" target="_blank"><i class="fas fa-external-link-alt"></i> View Website</a>
+<a href="adlogin.html" class="sidebar-link logout" onclick="handleLogout(event)"><i class="fas fa-sign-out-alt"></i> Logout</a>
+</nav>
+</aside>
+
+<main class="admin-main">
+<header class="admin-header">
+<button class="sidebar-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+<div class="header-title">
+<h1>Calendar View</h1>
+<p>Visualize bookings across the month</p>
+</div>
+<div class="header-actions">
+<div class="header-date" id="headerDate"></div>
+<button class="btn-add-booking" onclick="showAddBookingModal()"><i class="fas fa-plus"></i> Add Booking</button>
+</div>
+</header>
+
+<div style="padding:2rem;">
+<div class="admin-card">
+<div class="pk-cal-nav">
+<div class="pk-cal-nav-btns">
+<button onclick="calChangeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+<button class="pk-cal-today-btn" onclick="calGoToday()">Today</button>
+<button onclick="calChangeMonth(1)"><i class="fas fa-chevron-right"></i></button>
+</div>
+<h2 id="calMonthLabel"></h2>
+</div>
+<div class="pk-cal-grid" id="calGrid"></div>
+</div>
+
+<div class="admin-card" style="margin-top:1.5rem;">
+<div class="card-header">
+<h3>Bookings on <span id="calSelectedLabel"></span></h3>
+</div>
+<div class="bookings-table-wrap">
+<table class="bookings-table">
+<thead>
+<tr>
+<th>Booking Ref</th>
+<th>Customer</th>
+<th>Facility</th>
+<th>Time</th>
+<th>Amount</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody id="calDayTable">
+<tr><td colspan="6" class="pk-loading">Loading...</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+
+<div class="modal-overlay" id="addBookingModal" style="display:none;">
+<div class="admin-modal">
+<div class="modal-header">
+<h3>Add Manual Booking</h3>
+<button class="modal-close-btn" onclick="closeAddBookingModal()"><i class="fas fa-times"></i></button>
+</div>
+<div class="modal-body">
+<div class="form-grid">
+<div class="form-group">
+<label>Customer Name</label>
+<input type="text" id="bookingCustomerName" placeholder="Enter name">
+</div>
+<div class="form-group">
+<label>Phone</label>
+<input type="tel" id="bookingCustomerPhone" placeholder="+91 XXXXX XXXXX">
+</div>
+<div class="form-group form-full">
+<label>Email</label>
+<input type="email" id="bookingCustomerEmail" placeholder="email@example.com">
+</div>
+<div class="form-group">
+<label>Sport</label>
+<select id="bookingSport" onchange="onBookingSportChange()">
+<option value="football">Football Turf (6 & 7-a-side)</option>
+          <option value="boxcricket">Box Cricket</option>
+</select>
+</div>
+<div class="form-group">
+<label>Facility</label>
+<select id="bookingFacility" onchange="onBookingSlotInputsChange()">
+<option value="">Select facility</option>
+</select>
+</div>
+<div class="form-group">
+<label>Date</label>
+<input type="date" id="bookingDate" onchange="onBookingSlotInputsChange()">
+</div>
+<div class="form-group">
+<label>Time Slot</label>
+<select id="bookingTimeSlot">
+<option value="">Select date &amp; facility first</option>
+</select>
+</div>
+<div class="form-group">
+<label>Rate (Rs.)</label>
+<input type="number" id="bookingRate" placeholder="Enter rate" min="0" step="1">
+</div>
+<div class="form-group">
+<label>Payment Method</label>
+<select id="bookingPaymentMethod">
+<option value="cash">Cash</option>
+<option value="upi">UPI</option>
+<option value="card">Card</option>
+<option value="free">Free (Complimentary)</option>
+</select>
+</div>
+</div>
+</div>
+<div id="addBookingError" style="display:none;color:#ef4444;font-size:0.85rem;padding:0 1.5rem 0.75rem;"></div>
+<div class="modal-footer">
+<button class="btn-cancel" onclick="closeAddBookingModal()">Cancel</button>
+<button class="btn-confirm" id="createBookingBtn" onclick="submitAddBooking()">Create Booking</button>
+</div>
+</div>
+</div>
+
+<script src="admin.js"></script>
+<script>
+let calViewYear, calViewMonth, calSelectedDate;
+let calMonthBookings = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  const today = new Date();
+  calViewYear = today.getFullYear();
+  calViewMonth = today.getMonth();
+  calSelectedDate = toDateStr(today);
+  loadCalendarMonth();
+});
+
+function toDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function calChangeMonth(delta) {
+  calViewMonth += delta;
+  if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
+  if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+  loadCalendarMonth();
+}
+
+function calGoToday() {
+  const today = new Date();
+  calViewYear = today.getFullYear();
+  calViewMonth = today.getMonth();
+  calSelectedDate = toDateStr(today);
+  loadCalendarMonth();
+}
+
+async function loadCalendarMonth() {
+  const monthLabel = new Date(calViewYear, calViewMonth, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  document.getElementById('calMonthLabel').textContent = monthLabel;
+
+  const firstDay = new Date(calViewYear, calViewMonth, 1);
+  const lastDay = new Date(calViewYear, calViewMonth + 1, 0);
+  const from = toDateStr(firstDay);
+  const to = toDateStr(lastDay);
+
+  try {
+    const res = await fetch('/api/bookings?from=' + from + '&to=' + to, { credentials: 'include' });
+    calMonthBookings = res.ok ? ((await res.json()).bookings || []) : [];
+  } catch (err) {
+    calMonthBookings = [];
+  }
+
+  renderCalendarGrid(firstDay, lastDay);
+  renderSelectedDayTable();
+}
+
+function renderCalendarGrid(firstDay, lastDay) {
+  const grid = document.getElementById('calGrid');
+  const dows = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  let html = dows.map(d => '<div class="pk-cal-dow">' + d + '</div>').join('');
+
+  const startWeekday = firstDay.getDay();
+  for (let i = 0; i < startWeekday; i++) {
+    html += '<div class="pk-cal-cell pk-cal-empty"></div>';
+  }
+
+  const todayStr = toDateStr(new Date());
+  const countsByDate = {};
+  calMonthBookings.forEach(b => {
+    const key = String(b.booking_date).slice(0, 10);
+    if (b.status === 'cancelled') return;
+    countsByDate[key] = (countsByDate[key] || 0) + 1;
+  });
+
+  for (let day = 1; day <= lastDay.getDate(); day++) {
+    const d = new Date(calViewYear, calViewMonth, day);
+    const dateStr = toDateStr(d);
+    const count = countsByDate[dateStr] || 0;
+    const classes = ['pk-cal-cell'];
+    if (dateStr === todayStr) classes.push('pk-cal-today');
+    if (dateStr === calSelectedDate) classes.push('pk-cal-selected');
+    html += '<div class="' + classes.join(' ') + '" onclick="calSelectDate(\'' + dateStr + '\')">' +
+      '<span class="pk-cal-daynum">' + day + '</span>' +
+      (count ? '<div><span class="pk-cal-badge">' + count + ' booking' + (count > 1 ? 's' : '') + '</span></div>' : '') +
+      '</div>';
+  }
+  grid.innerHTML = html;
+}
+
+function calSelectDate(dateStr) {
+  calSelectedDate = dateStr;
+  renderCalendarGrid(new Date(calViewYear, calViewMonth, 1), new Date(calViewYear, calViewMonth + 1, 0));
+  renderSelectedDayTable();
+}
+
+function renderSelectedDayTable() {
+  const label = calSelectedDate ? new Date(calSelectedDate + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  document.getElementById('calSelectedLabel').textContent = label;
+
+  const tbody = document.getElementById('calDayTable');
+  const list = calMonthBookings.filter(b => String(b.booking_date).slice(0, 10) === calSelectedDate);
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="pk-empty">No bookings on this date.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(renderCalRow).join('');
+}
+
+function renderCalRow(b) {
+  const initial = (b.customer_name || '?').charAt(0).toUpperCase();
+  const statusClass = b.status === 'confirmed' ? 'confirmed' : (b.status === 'cancelled' ? 'cancelled' : 'reserved');
+  return '<tr>' +
+    '<td><code>' + escapeHtml(b.booking_ref) + '</code></td>' +
+    '<td><div class="customer-cell"><div class="customer-avatar">' + initial + '</div><div>' +
+    '<div class="customer-name">' + escapeHtml(b.customer_name) + '</div>' +
+    '<div class="customer-contact">' + escapeHtml(b.customer_phone) + '</div>' +
+    '</div></div></td>' +
+    '<td><span class="facility-tag">' + escapeHtml(b.option_name) + '</span></td>' +
+    '<td>' + formatTimeLabel(b.start_time) + ' – ' + formatTimeLabel(b.end_time) + '</td>' +
+    '<td class="amount">' + formatCurrency(b.amount) + '</td>' +
+    '<td><span class="status-badge ' + statusClass + '">' + capitalize(b.status) + '</span></td>' +
+    '</tr>';
+}
+</script>
+</body>
+</html>
