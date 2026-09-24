@@ -22,6 +22,20 @@ function generateBookingRef() {
   return `PBK-${ts}-${rand}`;
 }
 
+// Kept in sync with api/create-order.js: public self-service bookings cannot
+// be placed more than this many days ahead of today.
+const MAX_ADVANCE_DAYS = 30;
+function isBookingDateWithinAdvanceLimit(bookingDateStr) {
+  if (!bookingDateStr) return false;
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const maxDate = new Date(today);
+  maxDate.setUTCDate(maxDate.getUTCDate() + MAX_ADVANCE_DAYS);
+  const requested = new Date(bookingDateStr + 'T00:00:00Z');
+  if (isNaN(requested.getTime())) return false;
+  return requested >= today && requested <= maxDate;
+}
+
 export default async function handler(req, res) {
   const { resource } = req.query;
 
@@ -321,8 +335,11 @@ async function handleComplimentaryBooking(req, res) {
     if (body.terms_accepted !== true) {
       return res.status(400).json({ error: 'You must accept the Terms & Conditions before booking.' });
     }
-    if (!hours.every(function (h) { return Number.isInteger(h) && h >= 0 && h < 26; })) {
+    if (!hours.every(function (h) { return Number.isInteger(h) && h >= 0 && h < 24; })) {
       return res.status(400).json({ error: 'hours[] must contain valid hour numbers.' });
+    }
+    if (!isBookingDateWithinAdvanceLimit(booking_date)) {
+      return res.status(400).json({ error: 'Bookings can only be made up to ' + MAX_ADVANCE_DAYS + ' days in advance.' });
     }
 
     const facRows = await query('SELECT id, base_price, peak_price, sport_key, option_name FROM facilities WHERE option_id = $1 AND is_active = true', [facility_id]);
