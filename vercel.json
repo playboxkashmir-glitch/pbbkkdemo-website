@@ -4,7 +4,9 @@
       ],
       "routes": [
             { "src": "^/$", "has": [{ "type": "host", "value": "register.playboxkashmir.com" }], "dest": "/register/index.html", "continue": true },
-            { "src": "^/(?!api/|register/|assets/|favicon.png)(.*)$", "has": [{ "type": "host", "value": "register.playboxkashmir.com" }], "dest": "/register/$1", "continue": true }, { "src": "^/lib(?:/.*)?$", "status": 404 },
+            { "src": "^/(?!api/|register/|assets/|favicon.png)(.*)$", "has": [{ "type": "host", "value": "register.playboxkashmir.com" }], "dest": "/register/$1", "continue": true },
+            { "src": "^/$", "has": [{ "type": "host", "value": "admindb.playboxkashmir.com" }], "dest": "/admindb/adlogin.html", "continue": true },
+            { "src": "^/(?!api/|admindb/|assets/|favicon.png)(.*)$", "has": [{ "type": "host", "value": "admindb.playboxkashmir.com" }], "dest": "/admindb/$1", "continue": true }, { "src": "^/lib(?:/.*)?$", "status": 404 },
               { "src": "^/db(?:/.*)?$", "status": 404 },
               { "src": "^/scripts(?:/.*)?$", "status": 404 },
               { "src": "^/README-BACKEND\\.md$", "status": 404 },
