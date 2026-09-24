@@ -1,8 +1,8 @@
 
 
 const CONFIG = {
-  slotStartHour: 5,
-  slotEndHour: 26,
+  slotStartHour: 6,
+  slotEndHour: 24,
   peakHours: [18, 19, 20, 21],
   slotDurationMin: 60
 };
@@ -12,6 +12,8 @@ let currentFacilities = [];
 document.addEventListener('DOMContentLoaded', async () => {
   const authed = await checkSession();
   if (!authed) return;
+
+  injectScheduleFeature();
 
   const dateEl = document.getElementById('headerDate');
   if (dateEl) {
@@ -449,6 +451,174 @@ async function submitAddBooking() {
   }
 }
 
+// --- Live "Schedule" popup: injected into every admin page's sidebar + DOM ---
+// so the feature ships from this one shared file instead of editing every
+// admin/*.html page individually.
+
+function injectScheduleFeature() {
+  injectScheduleNavLink();
+  injectScheduleModalMarkup();
+}
+
+function injectScheduleNavLink() {
+  const nav = document.querySelector('.sidebar-nav');
+  if (!nav || document.getElementById('scheduleNavLink')) return;
+  const link = document.createElement('a');
+  link.href = '#';
+  link.id = 'scheduleNavLink';
+  link.className = 'sidebar-link';
+  link.innerHTML = '<i class="fas fa-clock"></i> Schedule';
+  link.addEventListener('click', function (e) {
+    e.preventDefault();
+    openScheduleModal();
+  });
+  const dashboardLink = nav.querySelector('a[href="dashboard.html"]');
+  if (dashboardLink && dashboardLink.nextSibling) {
+    nav.insertBefore(link, dashboardLink.nextSibling);
+  } else if (dashboardLink) {
+    nav.insertBefore(link, dashboardLink);
+  } else {
+    nav.insertBefore(link, nav.firstChild);
+  }
+}
+
+function injectScheduleModalMarkup() {
+  if (document.getElementById('scheduleModal')) return;
+  const html =
+    '<div class="modal-overlay" id="scheduleModal" style="display:none;">' +
+      '<div class="admin-modal schedule-modal">' +
+        '<div class="modal-header">' +
+          '<h3><i class="fas fa-clock"></i> Today\'s Schedule</h3>' +
+          '<button class="modal-close-btn" onclick="closeScheduleModal()"><i class="fas fa-times"></i></button>' +
+        '</div>' +
+        '<div class="modal-body schedule-modal-body">' +
+          '<div class="schedule-section-label">Happening Now</div>' +
+          '<div id="scheduleCurrentWrap" class="schedule-current-wrap">' +
+            '<div class="schedule-empty-state">Loading…</div>' +
+          '</div>' +
+          '<div class="schedule-section-label schedule-upcoming-label">Upcoming Today</div>' +
+          '<div id="scheduleUpcomingList" class="schedule-upcoming-list"></div>' +
+        '</div>' +
+        '<div class="modal-footer">' +
+          '<button class="btn-cancel" id="scheduleRefreshBtn" onclick="refreshSchedule()"><i class="fas fa-sync-alt"></i> Refresh</button>' +
+          '<button class="btn-confirm" onclick="closeScheduleModal()">Close</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  const overlay = document.getElementById('scheduleModal');
+  if (overlay) {
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) closeScheduleModal();
+    });
+  }
+}
+
+function openScheduleModal() {
+  const modal = document.getElementById('scheduleModal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  loadScheduleData();
+}
+
+function closeScheduleModal() {
+  const modal = document.getElementById('scheduleModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function refreshSchedule() {
+  loadScheduleData();
+}
+
+async function loadScheduleData() {
+  const btn = document.getElementById('scheduleRefreshBtn');
+  const currentWrap = document.getElementById('scheduleCurrentWrap');
+  const upcomingList = document.getElementById('scheduleUpcomingList');
+  if (!currentWrap || !upcomingList) return;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refreshing…'; }
+  const todayKey = new Date().toISOString().slice(0, 10);
+  try {
+    const res = await fetch('/api/bookings?date=' + todayKey, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to load bookings');
+    const data = await res.json();
+    const bookings = (data.bookings || []).filter(function (b) { return b.status !== 'cancelled'; });
+    renderScheduleView(bookings, new Date(), currentWrap, upcomingList);
+  } catch (err) {
+    console.error('Failed to load schedule', err);
+    currentWrap.innerHTML = '<div class="schedule-empty-state">Could not load today\'s schedule. Please try refreshing.</div>';
+    upcomingList.innerHTML = '';
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh'; }
+  }
+}
+
+function scheduleTimeToMinutes(t) {
+  if (!t) return 0;
+  const parts = String(t).split(':');
+  return (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+}
+
+function getPaymentStatusInfo(b) {
+  if (b.payment_status === 'partial') return { label: 'Partial', cls: 'partial' };
+  if (b.payment_status === 'paid') return { label: 'Paid', cls: 'paid' };
+  return { label: 'Unpaid', cls: 'unpaid' };
+}
+
+function renderScheduleView(bookings, now, currentWrap, upcomingList) {
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const current = [];
+  const upcoming = [];
+
+  bookings.forEach(function (b) {
+    const startMin = scheduleTimeToMinutes(b.start_time);
+    let endMin = scheduleTimeToMinutes(b.end_time);
+    if (endMin <= startMin) endMin += 24 * 60;
+    if (nowMin >= startMin && nowMin < endMin) {
+      current.push(b);
+    } else if (startMin > nowMin) {
+      upcoming.push(b);
+    }
+  });
+
+  current.sort(function (a, b) { return scheduleTimeToMinutes(a.start_time) - scheduleTimeToMinutes(b.start_time); });
+  upcoming.sort(function (a, b) { return scheduleTimeToMinutes(a.start_time) - scheduleTimeToMinutes(b.start_time); });
+
+  currentWrap.innerHTML = current.length
+    ? current.map(renderScheduleCurrentBar).join('')
+    : '<div class="schedule-empty-state">No booking is currently in progress.</div>';
+
+  upcomingList.innerHTML = upcoming.length
+    ? upcoming.map(renderScheduleUpcomingItem).join('')
+    : '<div class="schedule-empty-state">No more bookings scheduled for today.</div>';
+}
+
+function renderScheduleCurrentBar(b) {
+  const pay = getPaymentStatusInfo(b);
+  return '<div class="schedule-current-bar">' +
+    '<div class="schedule-current-badge">IN PROGRESS</div>' +
+    '<div class="schedule-current-main">' +
+      '<div class="schedule-current-customer">' + escapeHtml(b.customer_name) + '</div>' +
+      '<div class="schedule-current-facility"><i class="fas fa-building"></i> ' + escapeHtml(b.option_name || b.sport_name || '') + '</div>' +
+    '</div>' +
+    '<div class="schedule-current-meta">' +
+      '<span class="schedule-current-time">' + formatTimeLabel(b.start_time) + ' – ' + formatTimeLabel(b.end_time) + '</span>' +
+      '<span class="payment-pill ' + pay.cls + '">' + pay.label + '</span>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderScheduleUpcomingItem(b) {
+  const pay = getPaymentStatusInfo(b);
+  return '<div class="schedule-upcoming-item">' +
+    '<div class="schedule-upcoming-time">' + formatTimeLabel(b.start_time) + '<span>' + formatTimeLabel(b.end_time) + '</span></div>' +
+    '<div class="schedule-upcoming-info">' +
+      '<div class="schedule-upcoming-customer">' + escapeHtml(b.customer_name) + '</div>' +
+      '<div class="schedule-upcoming-facility">' + escapeHtml(b.option_name || b.sport_name || '') + '</div>' +
+    '</div>' +
+    '<span class="payment-pill ' + pay.cls + '">' + pay.label + '</span>' +
+  '</div>';
+}
+
 function formatTimeLabel(time24) {
   if (!time24) return '';
   const parts = String(time24).split(':');
@@ -489,7 +659,9 @@ function formatTimeLabel(time24) {
     'chevron-left': '<polyline points="15,4 7,12 15,20" fill="none" stroke="currentColor" stroke-width="2"/>',
     'chevron-right': '<polyline points="9,4 17,12 9,20" fill="none" stroke="currentColor" stroke-width="2"/>',
     'search': '<circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="20" y1="20" x2="15.2" y2="15.2" stroke="currentColor" stroke-width="1.8"/>',
-    'save': '<path d="M5 3h11l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="8" y="3" width="8" height="5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="7" y="13" width="10" height="7" fill="none" stroke="currentColor" stroke-width="1.4"/>'
+    'save': '<path d="M5 3h11l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="8" y="3" width="8" height="5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="7" y="13" width="10" height="7" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+    'clock': '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="12" y1="7" x2="12" y2="12.5" stroke="currentColor" stroke-width="1.6"/><line x1="12" y1="12.5" x2="15.5" y2="14.5" stroke="currentColor" stroke-width="1.6"/>',
+    'sync-alt': '<path d="M4 12a8 8 0 0 1 14-5.3" fill="none" stroke="currentColor" stroke-width="1.8"/><polyline points="18,3 18,7.3 13.7,7.3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M20 12a8 8 0 0 1-14 5.3" fill="none" stroke="currentColor" stroke-width="1.8"/><polyline points="6,21 6,16.7 10.3,16.7" fill="none" stroke="currentColor" stroke-width="1.8"/>'
   };
 
   function iconNameFromClassList(classList) {
