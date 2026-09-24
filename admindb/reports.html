@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reports – PlayBox Kashmir Admin</title>
+  <link rel="icon" type="image/png" href="../favicon.png">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="admin.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+.pk-empty,.pk-loading{text-align:center;color:#9ca3af;padding:2rem;}
+.pk-filter-bar{display:flex;align-items:flex-end;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap;}
+.pk-filter-field{display:flex;flex-direction:column;gap:0.3rem;}
+.pk-filter-field label{font-size:0.75rem;font-weight:600;color:#6b7280;}
+.pk-filter-field input{padding:0.55rem 0.75rem;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;font-size:0.85rem;}
+.pk-generate-btn{background:#1a56db;color:#fff;border:none;padding:0.6rem 1.2rem;border-radius:8px;font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit;}
+.pk-summary-line{display:flex;gap:2rem;padding:1rem 1.25rem;background:#f9fafb;border-radius:10px;margin-bottom:1rem;flex-wrap:wrap;}
+.pk-summary-item{display:flex;flex-direction:column;}
+.pk-summary-item .num{font-size:1.2rem;font-weight:800;color:#111827;}
+.pk-summary-item .label{font-size:0.75rem;color:#6b7280;}
+</style>
+</head>
+<body class="admin-body">
+
+<aside class="admin-sidebar" id="adminSidebar">
+<div class="sidebar-brand">
+<span class="logo-play">Play</span><span class="logo-box">Box</span>
+<span style="color:#f59e0b;font-size:0.75rem;font-weight:700;margin-left:4px;">ADMIN</span>
+</div>
+<nav class="sidebar-nav">
+<a href="dashboard.html" class="sidebar-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+<a href="bookings.html" class="sidebar-link"><i class="fas fa-calendar-check"></i> Bookings</a>
+<a href="cancel-bookings.html" class="sidebar-link"><i class="fas fa-ban"></i> Cancel Booking</a>
+<a href="calendar.html" class="sidebar-link"><i class="fas fa-calendar-alt"></i> Calendar View</a>
+<a href="customers.html" class="sidebar-link"><i class="fas fa-users"></i> Customers</a>
+<a href="facilities.html" class="sidebar-link"><i class="fas fa-building"></i> Facilities</a>
+<a href="pricing.html" class="sidebar-link"><i class="fas fa-tags"></i> Pricing</a>
+<a href="promos.html" class="sidebar-link"><i class="fas fa-percentage"></i> Promo Codes</a>
+<a href="reports.html" class="sidebar-link active"><i class="fas fa-chart-bar"></i> Reports</a>
+<a href="settings.html" class="sidebar-link"><i class="fas fa-cog"></i> Settings</a>
+  <a href="tournaments.html" class="sidebar-link"><i class="fas fa-trophy"></i> Tournament</a>
+  <a href="memberships.html" class="sidebar-link"><i class="fas fa-id-card"></i> Memberships</a>
+<div class="sidebar-divider"></div>
+<a href="https://www.playboxkashmir.com/" class="sidebar-link" target="_blank"><i class="fas fa-external-link-alt"></i> View Website</a>
+<a href="adlogin.html" class="sidebar-link logout" onclick="handleLogout(event)"><i class="fas fa-sign-out-alt"></i> Logout</a>
+</nav>
+</aside>
+
+<main class="admin-main">
+<header class="admin-header">
+<button class="sidebar-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+<div class="header-title">
+<h1>Reports</h1>
+<p>Business performance overview and custom date range reports</p>
+</div>
+<div class="header-actions">
+<div class="header-date" id="headerDate"></div>
+</div>
+</header>
+
+<div style="padding:2rem;">
+
+<div class="stats-grid">
+<div class="stat-card">
+<div class="stat-card-icon green"><i class="fas fa-calendar-check"></i></div>
+<div class="stat-card-info">
+<div class="stat-card-num" id="rep-today-count">-</div>
+<div class="stat-card-label">Today's Bookings</div>
+</div>
+</div>
+<div class="stat-card">
+<div class="stat-card-icon blue"><i class="fas fa-rupee-sign"></i></div>
+<div class="stat-card-info">
+<div class="stat-card-num" id="rep-today-revenue">-</div>
+<div class="stat-card-label">Today's Revenue</div>
+</div>
+</div>
+<div class="stat-card">
+<div class="stat-card-icon orange"><i class="fas fa-calendar-week"></i></div>
+<div class="stat-card-info">
+<div class="stat-card-num" id="rep-week-count">-</div>
+<div class="stat-card-label">This Week's Bookings</div>
+</div>
+</div>
+<div class="stat-card">
+<div class="stat-card-icon purple"><i class="fas fa-chart-line"></i></div>
+<div class="stat-card-info">
+<div class="stat-card-num" id="rep-month-revenue">-</div>
+<div class="stat-card-label">This Month's Revenue</div>
+</div>
+</div>
+</div>
+
+<div class="admin-card" style="margin-top:1.5rem;">
+<div class="card-header">
+<h3>Bookings by Sport</h3>
+</div>
+<div id="sportBreakdown" style="padding:1rem 0;">
+<p class="pk-loading">Loading...</p>
+</div>
+</div>
+
+<div class="admin-card" style="margin-top:1.5rem;">
+<div class="card-header">
+<h3>Custom Date Range Report</h3>
+</div>
+<div class="pk-filter-bar">
+<div class="pk-filter-field">
+<label>From</label>
+<input type="date" id="reportFrom">
+</div>
+<div class="pk-filter-field">
+<label>To</label>
+<input type="date" id="reportTo">
+</div>
+<button class="pk-generate-btn" onclick="generateReport()">Generate Report</button>
+</div>
+<div id="reportSummaryLine"></div>
+<div class="bookings-table-wrap">
+<table class="bookings-table">
+<thead>
+<tr>
+<th>Booking ID</th>
+<th>Customer</th>
+<th>Facility</th>
+<th>Date</th>
+<th>Amount</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody id="reportTable">
+<tr><td colspan="6" class="pk-empty">Choose a date range and click "Generate Report".</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+</div>
+</main>
+
+<script src="admin.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+loadReportSummary();
+const today = new Date().toISOString().slice(0, 10);
+const monthAgo = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
+document.getElementById('reportFrom').value = monthAgo;
+document.getElementById('reportTo').value = today;
+});
+
+async function loadReportSummary() {
+try {
+const res = await fetch('/api/reports/summary', { credentials: 'include' });
+if (!res.ok) return;
+const data = await res.json();
+setText('rep-today-count', data.today ? data.today.count : 0);
+setText('rep-today-revenue', formatCurrency(data.today ? data.today.revenue : 0));
+setText('rep-week-count', data.week ? data.week.count : 0);
+setText('rep-month-revenue', formatCurrency(data.month ? data.month.revenue : 0));
+
+const bySport = data.bySport || [];
+const el = document.getElementById('sportBreakdown');
+if (!bySport.length) {
+el.innerHTML = '<p class="pk-empty">No booking data yet.</p>';
+return;
+}
+const maxCount = Math.max.apply(null, bySport.map(s => Number(s.count)));
+el.innerHTML = bySport.map(s => {
+const pct = maxCount ? Math.round((Number(s.count) / maxCount) * 100) : 0;
+return '<div class="sport-row"><div class="sport-row-info"><span>' + escapeHtml(s.sport_name) + '</span></div>' +
+'<div class="sport-bar-wrap"><div class="sport-bar" style="width:' + pct + '%;background:#1a56db;"></div></div>' +
+'<span class="sport-pct">' + s.count + '</span></div>';
+}).join('');
+} catch (err) {
+console.error('Failed to load report summary', err);
+}
+}
+
+async function generateReport() {
+const from = document.getElementById('reportFrom').value;
+const to = document.getElementById('reportTo').value;
+const tbody = document.getElementById('reportTable');
+const summaryLine = document.getElementById('reportSummaryLine');
+if (!from || !to) { alert('Please choose both a from and to date.'); return; }
+
+tbody.innerHTML = '<tr><td colspan="6" class="pk-loading">Loading report...</td></tr>';
+summaryLine.innerHTML = '';
+
+try {
+const res = await fetch('/api/bookings?from=' + from + '&to=' + to, { credentials: 'include' });
+if (!res.ok) { tbody.innerHTML = '<tr><td colspan="6" class="pk-empty">Failed to load report.</td></tr>'; return; }
+const data = await res.json();
+const bookings = data.bookings || [];
+
+const counted = bookings.filter(b => b.status === 'confirmed' || b.status === 'completed');
+const totalRevenue = counted.reduce((sum, b) => sum + Number(b.amount), 0);
+
+summaryLine.innerHTML = '<div class="pk-summary-line">' +
+'<div class="pk-summary-item"><div class="num">' + bookings.length + '</div><div class="label">Total Bookings</div></div>' +
+'<div class="pk-summary-item"><div class="num">' + counted.length + '</div><div class="label">Confirmed / Completed</div></div>' +
+'<div class="pk-summary-item"><div class="num">' + formatCurrency(totalRevenue) + '</div><div class="label">Total Revenue</div></div>' +
+'</div>';
+
+if (!bookings.length) {
+tbody.innerHTML = '<tr><td colspan="6" class="pk-empty">No bookings found in this date range.</td></tr>';
+return;
+}
+
+tbody.innerHTML = bookings.map(renderReportRow).join('');
+} catch (err) {
+tbody.innerHTML = '<tr><td colspan="6" class="pk-empty">Failed to load report.</td></tr>';
+}
+}
+
+function renderReportRow(b) {
+const statusClass = b.status === 'confirmed' ? 'confirmed' : (b.status === 'cancelled' ? 'cancelled' : 'reserved');
+const dateLabel = b.booking_date ? new Date(b.booking_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+return '<tr>' +
+'<td><code>' + escapeHtml(b.booking_ref) + '</code></td>' +
+'<td>' + escapeHtml(b.customer_name) + '</td>' +
+'<td>' + escapeHtml(b.option_name) + '</td>' +
+'<td>' + dateLabel + '</td>' +
+'<td class="amount">' + formatCurrency(b.amount) + '</td>' +
+'<td><span class="status-badge ' + statusClass + '">' + capitalize(b.status) + '</span></td>' +
+'</tr>';
+}
+</script>
+</body>
+</html>

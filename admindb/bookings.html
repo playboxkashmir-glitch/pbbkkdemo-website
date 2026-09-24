@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bookings – PlayBox Kashmir Admin</title>
+          <link rel="icon" type="image/png" href="../favicon.png">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="admin.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+.pk-empty,.pk-loading{text-align:center;color:#9ca3af;padding:2rem;}
+.pk-filter-bar{display:flex;align-items:flex-end;gap:1rem;flex-wrap:wrap;margin-bottom:1.25rem;}
+.pk-filter-group{display:flex;flex-direction:column;gap:0.3rem;}
+.pk-filter-group label{font-size:0.75rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.03em;}
+.pk-filter-group input,.pk-filter-group select{padding:0.5rem 0.65rem;border:1px solid #e5e7eb;border-radius:6px;font-family:inherit;font-size:0.85rem;color:#111827;min-width:150px;}
+.pk-filter-btn{padding:0.55rem 1rem;border-radius:6px;border:none;font-weight:600;font-size:0.85rem;cursor:pointer;}
+.pk-filter-apply{background:#1a56db;color:#fff;}
+.pk-filter-clear{background:#f3f4f6;color:#374151;}
+.pk-details-row{display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #f3f4f6;font-size:0.9rem;}
+.pk-details-row span:first-child{color:#6b7280;}
+.pk-details-row span:last-child{color:#111827;font-weight:600;text-align:right;}
+</style>
+</head>
+<body class="admin-body">
+
+<aside class="admin-sidebar" id="adminSidebar">
+<div class="sidebar-brand">
+<span class="logo-play">Play</span><span class="logo-box">Box</span>
+<span style="color:#f59e0b;font-size:0.75rem;font-weight:700;margin-left:4px;">ADMIN</span>
+</div>
+<nav class="sidebar-nav">
+<a href="dashboard.html" class="sidebar-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+<a href="bookings.html" class="sidebar-link active"><i class="fas fa-calendar-check"></i> Bookings</a>
+<a href="cancel-bookings.html" class="sidebar-link"><i class="fas fa-ban"></i> Cancel Booking</a>
+<a href="calendar.html" class="sidebar-link"><i class="fas fa-calendar-alt"></i> Calendar View</a>
+<a href="customers.html" class="sidebar-link"><i class="fas fa-users"></i> Customers</a>
+<a href="facilities.html" class="sidebar-link"><i class="fas fa-building"></i> Facilities</a>
+<a href="pricing.html" class="sidebar-link"><i class="fas fa-tags"></i> Pricing</a>
+<a href="promos.html" class="sidebar-link"><i class="fas fa-percentage"></i> Promo Codes</a>
+<a href="reports.html" class="sidebar-link"><i class="fas fa-chart-bar"></i> Reports</a>
+<a href="settings.html" class="sidebar-link"><i class="fas fa-cog"></i> Settings</a>
+          <a href="tournaments.html" class="sidebar-link"><i class="fas fa-trophy"></i> Tournament</a>
+          <a href="memberships.html" class="sidebar-link"><i class="fas fa-id-card"></i> Memberships</a>
+<div class="sidebar-divider"></div>
+<a href="https://www.playboxkashmir.com/" class="sidebar-link" target="_blank"><i class="fas fa-external-link-alt"></i> View Website</a>
+<a href="adlogin.html" class="sidebar-link logout" onclick="handleLogout(event)"><i class="fas fa-sign-out-alt"></i> Logout</a>
+</nav>
+</aside>
+
+<main class="admin-main">
+<header class="admin-header">
+<button class="sidebar-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+<div class="header-title">
+<h1>Bookings</h1>
+<p>View and manage all your bookings</p>
+</div>
+<div class="header-actions">
+<div class="header-date" id="headerDate"></div>
+<button class="btn-add-booking" style="background:#374151;" onclick="showExportModal()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>Export</button>
+<button class="btn-add-booking" onclick="showAddBookingModal()"><i class="fas fa-plus"></i> Add Booking</button>
+</div>
+</header>
+
+<div style="padding:2rem;">
+<div class="admin-card">
+<div class="pk-filter-bar">
+<div class="pk-filter-group">
+<label>From</label>
+<input type="date" id="filterFrom">
+</div>
+<div class="pk-filter-group">
+<label>To</label>
+<input type="date" id="filterTo">
+</div>
+<div class="pk-filter-group">
+<label>Status</label>
+<select id="filterStatus">
+<option value="">All</option>
+<option value="confirmed">Confirmed</option>
+<option value="reserved">Reserved</option>
+<option value="cancelled">Cancelled</option>
+</select>
+</div>
+<div class="pk-filter-group">
+<label>Search</label>
+<input type="text" id="filterSearch" placeholder="Name, phone or ref">
+</div>
+<button class="pk-filter-btn pk-filter-apply" onclick="applyFilters()">Apply Filters</button>
+<button class="pk-filter-btn pk-filter-clear" onclick="clearFilters()">Clear</button>
+</div>
+<div class="bookings-table-wrap">
+<table class="bookings-table">
+<thead>
+<tr>
+<th>Booking Ref</th>
+<th>Customer</th>
+<th>Facility</th>
+<th>Date</th>
+<th>Time</th>
+<th>Amount</th>
+<th>Status</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="bookingsTable">
+<tr><td colspan="8" class="pk-loading">Loading bookings...</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+
+<div class="modal-overlay" id="bookingDetailsModal" style="display:none;">
+<div class="admin-modal">
+<div class="modal-header">
+<h3>Booking Details</h3>
+<button class="modal-close-btn" onclick="closeBookingDetailsModal()"><i class="fas fa-times"></i></button>
+</div>
+<div class="modal-body" id="bookingDetailsBody" style="padding:1.5rem;"></div>
+<div class="modal-footer">
+<button class="btn-cancel" onclick="closeBookingDetailsModal()">Close</button>
+</div>
+</div>
+</div>
+
+<div class="modal-overlay" id="addBookingModal" style="display:none;">
+<div class="admin-modal">
+<div class="modal-header">
+<h3>Add Manual Booking</h3>
+<button class="modal-close-btn" onclick="closeAddBookingModal()"><i class="fas fa-times"></i></button>
+</div>
+<div class="modal-body">
+<div class="form-grid">
+<div class="form-group">
+<label>Customer Name</label>
+<input type="text" id="bookingCustomerName" placeholder="Enter name">
+</div>
+<div class="form-group">
+<label>Phone</label>
+<input type="tel" id="bookingCustomerPhone" placeholder="+91 XXXXX XXXXX">
+</div>
+<div class="form-group form-full">
+<label>Email</label>
+<input type="email" id="bookingCustomerEmail" placeholder="email@example.com">
+</div>
+<div class="form-group">
+<label>Sport</label>
+<select id="bookingSport" onchange="onBookingSportChange()">
+<option value="football">Football Turf (6 & 7-a-side)</option>
+          <option value="boxcricket">Box Cricket</option>
+</select>
+</div>
+<div class="form-group">
+<label>Facility</label>
+<select id="bookingFacility" onchange="onBookingSlotInputsChange()">
+<option value="">Select facility</option>
+</select>
+</div>
+<div class="form-group">
+<label>Date</label>
+<input type="date" id="bookingDate" onchange="onBookingSlotInputsChange()">
+</div>
+<div class="form-group">
+<label>Time Slot</label>
+<select id="bookingTimeSlot">
+<option value="">Select date &amp; facility first</option>
+</select>
+</div>
+<div class="form-group">
+<label>Rate (Rs.)</label>
+<input type="number" id="bookingRate" placeholder="Enter rate" min="0" step="1">
+</div>
+<div class="form-group">
+<label>Payment Method</label>
+<select id="bookingPaymentMethod">
+<option value="cash">Cash</option>
+<option value="upi">UPI</option>
+<option value="card">Card</option>
+<option value="free">Free (Complimentary)</option>
+</select>
+</div>
+</div>
+</div>
+<div id="addBookingError" style="display:none;color:#ef4444;font-size:0.85rem;padding:0 1.5rem 0.75rem;"></div>
+<div class="modal-footer">
+<button class="btn-cancel" onclick="closeAddBookingModal()">Cancel</button>
+<button class="btn-confirm" id="createBookingBtn" onclick="submitAddBooking()">Create Booking</button>
+</div>
+</div>
+</div>
+
+
+<div class="modal-overlay" id="exportBookingsModal" style="display:none;">
+<div class="admin-modal">
+<div class="modal-header">
+<h3>Export Bookings</h3>
+<button class="modal-close-btn" onclick="closeExportModal()">&times;</button>
+</div>
+<div class="modal-body">
+<p style="color:#6b7280;font-size:0.85rem;margin-top:0;">Leave dates blank to export all bookings, or pick a quick range below.</p>
+<div class="form-grid">
+<div class="form-group">
+<label>Date Range</label>
+<select id="exportRangePreset" onchange="onExportRangePresetChange()">
+<option value="custom">Custom Range</option>
+<option value="current_month">Current Month</option>
+<option value="last_month">Last Month</option>
+<option value="last_3_months">Last 3 Months</option>
+<option value="last_6_months">Last 6 Months</option>
+</select>
+</div>
+<div class="form-group">
+<label>From</label>
+<input type="date" id="exportFrom">
+</div>
+<div class="form-group">
+<label>To</label>
+<input type="date" id="exportTo">
+</div>
+<div class="form-group">
+<label>Turf Type</label>
+<select id="exportTurfType">
+<option value="">All</option>
+</select>
+</div>
+<div class="form-group">
+<label>Payment Mode</label>
+<select id="exportPaymentMode">
+<option value="">All</option>
+<option value="online">Online</option>
+<option value="offline">Offline</option>
+</select>
+</div>
+</div>
+</div>
+<div class="modal-footer">
+<button class="btn-cancel" onclick="closeExportModal()">Close</button>
+<button class="btn-confirm" onclick="exportBookingsCsv()">Download CSV</button>
+<button class="btn-confirm" onclick="exportBookingsPdf()">Export PDF</button>
+</div>
+</div>
+</div>
+
+<script src="admin.js"></script>
+<script>
+let allBookingsCache = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadBookingsList();
+});
+
+function buildQuery() {
+  const from = document.getElementById('filterFrom').value;
+  const to = document.getElementById('filterTo').value;
+  const status = document.getElementById('filterStatus').value;
+  const params = [];
+  if (from) params.push('from=' + from);
+  if (to) params.push('to=' + to);
+  if (status) params.push('status=' + status);
+  return params.length ? ('?' + params.join('&')) : '';
+}
+
+async function loadBookingsList() {
+  const tbody = document.getElementById('bookingsTable');
+  tbody.innerHTML = '<tr><td colspan="8" class="pk-loading">Loading bookings...</td></tr>';
+  try {
+    const res = await fetch('/api/bookings' + buildQuery(), { credentials: 'include' });
+    if (!res.ok) { tbody.innerHTML = '<tr><td colspan="8" class="pk-empty">Failed to load bookings.</td></tr>'; return; }
+    const data = await res.json();
+    allBookingsCache = data.bookings || [];
+    renderBookingsTable();
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="8" class="pk-empty">Failed to load bookings.</td></tr>';
+  }
+}
+
+function renderBookingsTable() {
+  const tbody = document.getElementById('bookingsTable');
+  const search = document.getElementById('filterSearch').value.trim().toLowerCase();
+  let list = allBookingsCache;
+  if (search) {
+    list = list.filter(b =>
+      (b.customer_name || '').toLowerCase().includes(search) ||
+      (b.customer_phone || '').toLowerCase().includes(search) ||
+      (b.booking_ref || '').toLowerCase().includes(search)
+    );
+  }
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="pk-empty">No bookings found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(renderRow).join('');
+}
+
+function renderRow(b) {
+  const initial = (b.customer_name || '?').charAt(0).toUpperCase();
+  const statusClass = b.status === 'confirmed' ? 'confirmed' : (b.status === 'cancelled' ? 'cancelled' : 'reserved');
+  const dateLabel = b.booking_date ? new Date(b.booking_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  return '<tr>' +
+    '<td><code>' + escapeHtml(b.booking_ref) + '</code></td>' +
+    '<td><div class="customer-cell"><div class="customer-avatar">' + initial + '</div><div>' +
+    '<div class="customer-name">' + escapeHtml(b.customer_name) + '</div>' +
+    '<div class="customer-contact">' + escapeHtml(b.customer_phone) + '</div>' +
+    '</div></div></td>' +
+    '<td><span class="facility-tag">' + escapeHtml(b.option_name) + '</span></td>' +
+    '<td>' + dateLabel + '</td>' +
+    '<td>' + formatTimeLabel(b.start_time) + ' – ' + formatTimeLabel(b.end_time) + '</td>' +
+    '<td class="amount">' + formatCurrency(b.amount) + '</td>' +
+    '<td><span class="status-badge ' + statusClass + '">' + capitalize(b.status) + '</span></td>' +
+    '<td>' +
+    '<button class="btn-icon" title="View" style="display:inline-flex;align-items:center;justify-content:center;" onclick="viewBooking(' + b.id + ')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>' +
+    '</td>' +
+    '</tr>';
+}
+
+function applyFilters() {
+  loadBookingsList();
+}
+
+function clearFilters() {
+  document.getElementById('filterFrom').value = '';
+  document.getElementById('filterTo').value = '';
+  document.getElementById('filterStatus').value = '';
+  document.getElementById('filterSearch').value = '';
+  loadBookingsList();
+}
+
+function viewBooking(id) {
+  const b = allBookingsCache.find(x => x.id === id);
+  if (!b) return;
+  const dateLabel = b.booking_date ? new Date(b.booking_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  const rows = [
+    ['Booking Ref', b.booking_ref],
+    ['Customer', b.customer_name],
+    ['Phone', b.customer_phone],
+    ['Email', b.customer_email],
+    ['Facility', b.option_name + ' (' + b.sport_name + ')'],
+    ['Date', dateLabel],
+    ['Time', formatTimeLabel(b.start_time) + ' – ' + formatTimeLabel(b.end_time)],
+    ['Amount', formatCurrency(b.amount)],
+    ['Payment Method', capitalize(b.payment_method || '')],
+    ['Status', capitalize(b.status)],
+    ['Notes', b.notes || '—']
+  ];
+  document.getElementById('bookingDetailsBody').innerHTML = rows.map(r =>
+    '<div class="pk-details-row"><span>' + escapeHtml(r[0]) + '</span><span>' + escapeHtml(String(r[1] || '')) + '</span></div>'
+  ).join('');
+  document.getElementById('bookingDetailsModal').style.display = 'flex';
+}
+
+function closeBookingDetailsModal() {
+  document.getElementById('bookingDetailsModal').style.display = 'none';
+}
+
+function showExportModal() {
+  document.getElementById('exportRangePreset').value = 'custom';
+  document.getElementById('exportFrom').value = '';
+  document.getElementById('exportTo').value = '';
+  document.getElementById('exportPaymentMode').value = '';
+  document.getElementById('exportBookingsModal').style.display = 'flex';
+  populateExportTurfOptions();
+}
+
+function closeExportModal() {
+  document.getElementById('exportBookingsModal').style.display = 'none';
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function toDateStr(d) {
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+}
+
+function onExportRangePresetChange() {
+  const preset = document.getElementById('exportRangePreset').value;
+  const now = new Date();
+  let from = null, to = null;
+  if (preset === 'current_month') {
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+    to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else if (preset === 'last_month') {
+    from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    to = new Date(now.getFullYear(), now.getMonth(), 0);
+  } else if (preset === 'last_3_months') {
+    from = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else if (preset === 'last_6_months') {
+    from = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  } else {
+    document.getElementById('exportFrom').value = '';
+    document.getElementById('exportTo').value = '';
+    return;
+  }
+  document.getElementById('exportFrom').value = toDateStr(from);
+  document.getElementById('exportTo').value = toDateStr(to);
+}
+
+async function populateExportTurfOptions() {
+  const sel = document.getElementById('exportTurfType');
+  const currentVal = sel.value;
+  try {
+    const res = await fetch('/api/bookings', { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const list = data.bookings || [];
+    const types = [...new Set(list.map(b => b.sport_name).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">All</option>' + types.map(t => '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>').join('');
+    sel.value = currentVal;
+  } catch (err) {
+    /* keep default All option */
+  }
+}
+
+async function fetchBookingsForExport() {
+  const from = document.getElementById('exportFrom').value;
+  const to = document.getElementById('exportTo').value;
+  const turfType = document.getElementById('exportTurfType').value;
+  const paymentMode = document.getElementById('exportPaymentMode').value;
+  let url = '/api/bookings';
+  const params = [];
+  if (from) params.push('from=' + from);
+  if (to) params.push('to=' + to);
+  if (params.length) url += '?' + params.join('&');
+  const res = await fetch(url, { credentials: 'include' });
+  if (!res.ok) { alert('Failed to fetch bookings for export.'); return null; }
+  const data = await res.json();
+  let list = data.bookings || [];
+  if (turfType) list = list.filter(b => b.sport_name === turfType);
+  if (paymentMode === 'online') list = list.filter(b => b.payment_method === 'razorpay');
+  if (paymentMode === 'offline') list = list.filter(b => b.payment_method !== 'razorpay');
+  return list;
+}
+
+function csvEscape(val) {
+  const s = String(val === null || val === undefined ? '' : val);
+  if (/["\n,]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+async function exportBookingsCsv() {
+  const list = await fetchBookingsForExport();
+  if (!list) return;
+  if (!list.length) { alert('No bookings found for the selected filters.'); return; }
+  const headers = ['Booking Ref','Customer Name','Phone','Email','Facility','Turf Type','Date','Start Time','End Time','Amount','Payment Method','Status'];
+  const rows = list.map(b => [
+    b.booking_ref,
+    b.customer_name,
+    b.customer_phone,
+    b.customer_email,
+    b.option_name,
+    b.sport_name,
+    b.booking_date,
+    formatTimeLabel(b.start_time),
+    formatTimeLabel(b.end_time),
+    b.amount,
+    b.payment_method,
+    b.status
+  ]);
+  let csv = headers.map(csvEscape).join(',') + '\n';
+  csv += rows.map(r => r.map(csvEscape).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'playbox-bookings-' + toDateStr(new Date()) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function exportBookingsPdf() {
+  const list = await fetchBookingsForExport();
+  if (!list) return;
+  if (!list.length) { alert('No bookings found for the selected filters.'); return; }
+  const from = document.getElementById('exportFrom').value;
+  const to = document.getElementById('exportTo').value;
+  const rowsHtml = list.map(b => (
+    '<tr>' +
+    '<td>' + escapeHtml(b.booking_ref) + '</td>' +
+    '<td>' + escapeHtml(b.customer_name) + '</td>' +
+    '<td>' + escapeHtml(b.customer_phone) + '</td>' +
+    '<td>' + escapeHtml(b.option_name) + '</td>' +
+    '<td>' + (b.booking_date ? new Date(b.booking_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '') + '</td>' +
+    '<td>' + formatTimeLabel(b.start_time) + ' - ' + formatTimeLabel(b.end_time) + '</td>' +
+    '<td>' + formatCurrency(b.amount) + '</td>' +
+    '<td>' + capitalize(b.payment_method || '') + '</td>' +
+    '<td>' + capitalize(b.status) + '</td>' +
+    '</tr>'
+  )).join('');
+  const html = '<!DOCTYPE html><html><head><title>PlayBox Kashmir - Bookings Export</title>' +
+    '<style>body{font-family:Arial,sans-serif;padding:20px;} h1{font-size:18px;margin-bottom:0;} p{color:#6b7280;margin-top:4px;} table{width:100%;border-collapse:collapse;margin-top:16px;} th,td{border:1px solid #e5e7eb;padding:6px 8px;font-size:12px;text-align:left;} th{background:#f3f4f6;}</style>' +
+    '</head><body>' +
+    '<h1>PlayBox Kashmir - Bookings Export</h1>' +
+    '<p>Range: ' + (from || 'All') + ' to ' + (to || 'All') + ' | Generated: ' + new Date().toLocaleString('en-IN') + '</p>' +
+    '<table><thead><tr><th>Booking Ref</th><th>Customer</th><th>Phone</th><th>Facility</th><th>Date</th><th>Time</th><th>Amount</th><th>Payment</th><th>Status</th></tr></thead>' +
+    '<tbody>' + rowsHtml + '</tbody></table>' +
+    '</body></html>';
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => { w.focus(); w.print(); }, 400);
+}
+</script>
+</body>
+</html>

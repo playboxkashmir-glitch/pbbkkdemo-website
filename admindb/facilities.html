@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facilities – PlayBox Kashmir Admin</title>
+  <link rel="icon" type="image/png" href="../favicon.png">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="admin.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+.pk-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap;}
+.pk-empty,.pk-loading{text-align:center;color:#9ca3af;padding:2rem;}
+.pk-field-inline{display:flex;align-items:center;gap:0.4rem;}
+.pk-field-inline input{width:80px;padding:0.35rem 0.5rem;border:1px solid #e5e7eb;border-radius:6px;font-family:inherit;font-size:0.8rem;}
+</style>
+</head>
+<body class="admin-body">
+
+<aside class="admin-sidebar" id="adminSidebar">
+<div class="sidebar-brand">
+<span class="logo-play">Play</span><span class="logo-box">Box</span>
+<span style="color:#f59e0b;font-size:0.75rem;font-weight:700;margin-left:4px;">ADMIN</span>
+</div>
+<nav class="sidebar-nav">
+<a href="dashboard.html" class="sidebar-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+<a href="bookings.html" class="sidebar-link"><i class="fas fa-calendar-check"></i> Bookings</a>
+<a href="cancel-bookings.html" class="sidebar-link"><i class="fas fa-ban"></i> Cancel Booking</a>
+<a href="calendar.html" class="sidebar-link"><i class="fas fa-calendar-alt"></i> Calendar View</a>
+<a href="customers.html" class="sidebar-link"><i class="fas fa-users"></i> Customers</a>
+<a href="facilities.html" class="sidebar-link active"><i class="fas fa-building"></i> Facilities</a>
+<a href="pricing.html" class="sidebar-link"><i class="fas fa-tags"></i> Pricing</a>
+<a href="promos.html" class="sidebar-link"><i class="fas fa-percentage"></i> Promo Codes</a>
+<a href="reports.html" class="sidebar-link"><i class="fas fa-chart-bar"></i> Reports</a>
+<a href="settings.html" class="sidebar-link"><i class="fas fa-cog"></i> Settings</a>
+  <a href="tournaments.html" class="sidebar-link"><i class="fas fa-trophy"></i> Tournament</a>
+  <a href="memberships.html" class="sidebar-link"><i class="fas fa-id-card"></i> Memberships</a>
+<div class="sidebar-divider"></div>
+<a href="https://www.playboxkashmir.com/" class="sidebar-link" target="_blank"><i class="fas fa-external-link-alt"></i> View Website</a>
+<a href="adlogin.html" class="sidebar-link logout" onclick="handleLogout(event)"><i class="fas fa-sign-out-alt"></i> Logout</a>
+</nav>
+</aside>
+
+<main class="admin-main">
+<header class="admin-header">
+<button class="sidebar-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+<div class="header-title">
+<h1>Facilities</h1>
+<p>Manage your sports facilities and their availability</p>
+</div>
+<div class="header-actions">
+<div class="header-date" id="headerDate"></div>
+<button class="btn-add-booking" onclick="showAddFacilityModal()"><i class="fas fa-plus"></i> Add Facility</button>
+</div>
+</header>
+
+<div style="padding:2rem;">
+<div class="admin-card">
+<div class="pk-toolbar"></div>
+<div class="bookings-table-wrap">
+<table class="bookings-table">
+<thead>
+<tr>
+<th>Sport</th>
+<th>Facility</th>
+<th>Base Price</th>
+<th>Peak Price</th>
+<th>Status</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="facilitiesTable">
+<tr><td colspan="6" class="pk-loading">Loading facilities...</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+
+<div class="modal-overlay" id="facilityModal" style="display:none;">
+<div class="admin-modal">
+<div class="modal-header">
+<h3 id="facilityModalTitle">Add Facility</h3>
+<button class="modal-close-btn" onclick="closeFacilityModal()"><i class="fas fa-times"></i></button>
+</div>
+<div class="modal-body">
+<div class="form-grid">
+<div class="form-group">
+<label>Sport Key</label>
+<input type="text" id="facilitySportKey" placeholder="e.g. football">
+</div>
+<div class="form-group">
+<label>Sport Name</label>
+<input type="text" id="facilitySportName" placeholder="e.g. Football Turf">
+</div>
+<div class="form-group">
+<label>Option ID</label>
+<input type="text" id="facilityOptionId" placeholder="e.g. turf-3">
+</div>
+<div class="form-group">
+<label>Facility / Option Name</label>
+<input type="text" id="facilityOptionName" placeholder="e.g. Football Turf 3">
+</div>
+<div class="form-group">
+<label>Base Price (Rs.)</label>
+<input type="number" id="facilityBasePrice" min="0" step="1" placeholder="Enter base price">
+</div>
+<div class="form-group">
+<label>Peak Price (Rs.)</label>
+<input type="number" id="facilityPeakPrice" min="0" step="1" placeholder="Enter peak price">
+</div>
+</div>
+<div id="facilityError" style="display:none;color:#ef4444;font-size:0.85rem;padding:0 1.5rem 0.75rem;"></div>
+</div>
+<div class="modal-footer">
+<button class="btn-cancel" onclick="closeFacilityModal()">Cancel</button>
+<button class="btn-confirm" id="saveFacilityBtn" onclick="submitFacility()">Save Facility</button>
+</div>
+</div>
+</div>
+
+<script src="admin.js"></script>
+<script>
+let editingFacilityId = null;
+let allFacilities = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadFacilitiesList();
+});
+
+async function loadFacilitiesList() {
+  const tbody = document.getElementById('facilitiesTable');
+  tbody.innerHTML = '<tr><td colspan="6" class="pk-loading">Loading facilities...</td></tr>';
+  try {
+    const res = await fetch('/api/facilities', { credentials: 'include' });
+    if (!res.ok) { tbody.innerHTML = '<tr><td colspan="6" class="pk-empty">Failed to load facilities.</td></tr>'; return; }
+    const data = await res.json();
+    allFacilities = data.facilities || [];
+    if (!allFacilities.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="pk-empty">No facilities yet. Click "Add Facility" to create one.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = allFacilities.map(renderFacilityRow).join('');
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="6" class="pk-empty">Failed to load facilities.</td></tr>';
+  }
+}
+
+function renderFacilityRow(f) {
+  const active = f.is_active !== false;
+  const statusClass = active ? 'confirmed' : 'cancelled';
+  const statusLabel = active ? 'Active' : 'Inactive';
+  return '<tr>' +
+    '<td>' + escapeHtml(f.sport_name) + '</td>' +
+    '<td>' + escapeHtml(f.option_name) + '</td>' +
+    '<td class="amount">' + formatCurrency(f.base_price) + '</td>' +
+    '<td class="amount">' + formatCurrency(f.peak_price) + '</td>' +
+    '<td><span class="status-badge ' + statusClass + '">' + statusLabel + '</span></td>' +
+    '<td>' +
+    '<button class="btn-icon" title="Edit" onclick="openEditFacility(' + f.id + ')"><i class="fas fa-edit"></i></button>' +
+    '<button class="btn-icon' + (active ? ' danger' : '') + '" title="' + (active ? 'Deactivate' : 'Activate') + '" onclick="toggleFacilityActive(' + f.id + ', ' + active + ')"><i class="fas fa-' + (active ? 'ban' : 'check') + '"></i></button>' +
+    '</td>' +
+    '</tr>';
+}
+
+function showAddFacilityModal() {
+  editingFacilityId = null;
+  document.getElementById('facilityModalTitle').textContent = 'Add Facility';
+  ['facilitySportKey','facilitySportName','facilityOptionId','facilityOptionName','facilityBasePrice','facilityPeakPrice'].forEach(id => {
+    document.getElementById(id).value = '';
+    document.getElementById(id).disabled = false;
+  });
+  hideFacilityError();
+  document.getElementById('facilityModal').style.display = 'flex';
+}
+
+function openEditFacility(id) {
+  const f = allFacilities.find(x => x.id === id);
+  if (!f) return;
+  editingFacilityId = id;
+  document.getElementById('facilityModalTitle').textContent = 'Edit Facility';
+  document.getElementById('facilitySportKey').value = f.sport_key;
+  document.getElementById('facilitySportKey').disabled = true;
+  document.getElementById('facilitySportName').value = f.sport_name;
+  document.getElementById('facilitySportName').disabled = true;
+  document.getElementById('facilityOptionId').value = f.option_id;
+  document.getElementById('facilityOptionId').disabled = true;
+  document.getElementById('facilityOptionName').value = f.option_name;
+  document.getElementById('facilityBasePrice').value = f.base_price;
+  document.getElementById('facilityPeakPrice').value = f.peak_price;
+  hideFacilityError();
+  document.getElementById('facilityModal').style.display = 'flex';
+}
+
+function closeFacilityModal() {
+  document.getElementById('facilityModal').style.display = 'none';
+}
+
+function showFacilityError(msg) {
+  const el = document.getElementById('facilityError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function hideFacilityError() {
+  const el = document.getElementById('facilityError');
+  el.style.display = 'none';
+  el.textContent = '';
+}
+
+async function submitFacility() {
+  const btn = document.getElementById('saveFacilityBtn');
+  const optionName = document.getElementById('facilityOptionName').value.trim();
+  const basePrice = document.getElementById('facilityBasePrice').value;
+  const peakPrice = document.getElementById('facilityPeakPrice').value;
+
+  if (!optionName || basePrice === '') {
+    showFacilityError('Facility name and base price are required.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  try {
+    if (editingFacilityId) {
+      const res = await fetch('/api/facilities?id=' + editingFacilityId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ option_name: optionName, base_price: Number(basePrice), peak_price: peakPrice ? Number(peakPrice) : Number(basePrice) })
+      });
+      const data = await res.json();
+      if (!res.ok) { showFacilityError(data.error || 'Could not update facility.'); return; }
+    } else {
+      const sportKey = document.getElementById('facilitySportKey').value.trim();
+      const sportName = document.getElementById('facilitySportName').value.trim();
+      const optionId = document.getElementById('facilityOptionId').value.trim();
+      if (!sportKey || !sportName || !optionId) {
+        showFacilityError('Sport key, sport name and option ID are required.');
+        return;
+      }
+      const res = await fetch('/api/facilities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ sport_key: sportKey, sport_name: sportName, option_id: optionId, option_name: optionName, base_price: Number(basePrice), peak_price: peakPrice ? Number(peakPrice) : Number(basePrice) })
+      });
+      const data = await res.json();
+      if (!res.ok) { showFacilityError(data.error || 'Could not create facility.'); return; }
+    }
+    closeFacilityModal();
+    await loadFacilitiesList();
+  } catch (err) {
+    showFacilityError('Network error. Please try again.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Facility';
+  }
+}
+
+async function toggleFacilityActive(id, currentlyActive) {
+  try {
+    const res = await fetch('/api/facilities?id=' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ is_active: !currentlyActive })
+    });
+    if (!res.ok) { alert('Could not update facility status.'); return; }
+    await loadFacilitiesList();
+  } catch (err) {
+    alert('Network error. Please try again.');
+  }
+}
+</script>
+</body>
+</html>
